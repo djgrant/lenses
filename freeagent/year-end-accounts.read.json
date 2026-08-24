@@ -1,0 +1,59 @@
+{
+  "name": "@djgrant/freeagent/year-end-accounts",
+  "description": "Reads one FreeAgent year-end account document, deadlines, filing stages, and report/download links.",
+  "url": "https://{account}.freeagent.com/accounting/end_of_year/{end_date}",
+  "params": {
+    "end_date": {"type": "string", "default": {"$lens": "@djgrant/freeagent/accounting-periods", "field": "current_end_date"}}
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "accounting_year": "string",
+      "end_date": "string",
+      "total_liability": "number",
+      "hmrc_filing_due": "string",
+      "payment_due": "string",
+      "companies_house_filing_due": "string",
+      "full_report_url": "string",
+      "full_report_pdf_url": "string",
+      "companies_house_report_url": {"type": "string", "nullable": true},
+      "companies_house_report_pdf_url": "string",
+      "ct600_report_url": {"type": "string", "nullable": true},
+      "ct600_report_pdf_url": "string",
+      "approval_url": {"type": "string", "nullable": true},
+      "final_accounts_url": {"type": "string", "nullable": true},
+      "ct600_url": {"type": "string", "nullable": true},
+      "filing_stages": {"type": "array", "items": {"stage": "string", "status": "string"}}
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $trim($s); $neg := $contains($v, '(') or $contains($v, '-'); $n := $number($replace($replace($replace($replace($v, /[£,]/, ''), /\\(/, ''), /\\)/, ''), /-/, '')); $neg ? -$n : $n) }"},
+  "effects": {"reads": ["FreeAgent account year-end accounts and filing status"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "heading": {"selector": ".fe-PageHeader-title .fe-u-truncate"},
+        "liability": {"selector": "#tax_chargeable"},
+        "hmrc_due": {"selector": "#meta .fe-ValuePair-list:nth-of-type(2) .fe-ValuePair:nth-child(1) time", "attr": "datetime"},
+        "payment_due": {"selector": "#meta .fe-ValuePair-list:nth-of-type(2) .fe-ValuePair:nth-child(2) time", "attr": "datetime"},
+        "ch_due": {"selector": "#meta .fe-ValuePair-list:nth-of-type(2) .fe-ValuePair:nth-child(3) time", "attr": "datetime"},
+        "full_report": {"selector": ".fe-Tabs a[href*='view=full']", "attr": "href"},
+        "full_pdf": {"selector": "a[href$='.pdf?view=full']", "attr": "href"},
+        "abbr_report": {"selector": ".fe-Tabs a[href*='view=abbr']", "attr": "href"},
+        "ct600_report": {"selector": ".fe-Tabs a[href*='view=ct600']", "attr": "href"},
+        "approval": {"selector": "a[href$='/approve']", "attr": "href"},
+        "final_accounts": {"selector": ".fe-FilingStatus a[href^='/accounting/final_accounts/']", "attr": "href"},
+        "ct600": {"selector": ".fe-FilingStatus a[href$='/ct600']", "attr": "href"}
+      },
+      "post": "{'accounting_year': $trim($substringAfter(heading, 'End of Year ')), 'end_date': $end_date, 'total_liability': $money(liability), 'hmrc_filing_due': hmrc_due, 'payment_due': payment_due, 'companies_house_filing_due': ch_due, 'full_report_url': full_report, 'full_report_pdf_url': full_pdf, 'companies_house_report_url': abbr_report ? abbr_report : null, 'companies_house_report_pdf_url': ('https://' & $account & '.freeagent.com') & '/accounting/end_of_year/' & $end_date & '.pdf?view=abbr', 'ct600_report_url': ct600_report ? ct600_report : null, 'ct600_report_pdf_url': ('https://' & $account & '.freeagent.com') & '/accounting/end_of_year/' & $end_date & '.pdf?ct600_date=' & $end_date & '&view=ct600', 'approval_url': approval ? approval : null, 'final_accounts_url': final_accounts ? final_accounts : null, 'ct600_url': ct600 ? ct600 : null}"
+    },
+    {
+      "kind": "dom",
+      "item": ".fe-FilingStatus > .fe-FilingStatus-state",
+      "fields": {"stage": {"selector": ".fe-FilingStatus-label"}, "classes": {"selector": ":self", "attr": "class"}},
+      "post": "{'filing_stages': $.{'stage': stage, 'status': $contains(classes, '--current') ? 'current' : ($contains(classes, '--complete') ? 'complete' : ($contains(classes, '--pending') ? 'pending' : 'unknown'))}}"
+    }
+  ]
+}

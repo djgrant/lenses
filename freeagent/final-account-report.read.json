@@ -1,0 +1,41 @@
+{
+  "name": "@djgrant/freeagent/final-account-report",
+  "description": "Reads a detailed FreeAgent Final Accounts report, including headline and expanded nominal rows plus filing exports.",
+  "url": "https://{account}.freeagent.com/accounting/final_accounts/{end_date}",
+  "params": {"end_date": {"type": "string", "default": {"$lens": "@djgrant/freeagent/accounting-periods", "field": "current_end_date"}}},
+  "returns": {"type": "object", "fields": {
+    "end_date": "string", "accounting_year": "string", "current_year": "string", "previous_year": "string",
+    "status": "string", "settings_url": "string", "full_ixbrl_url": "string", "full_pdf_url": "string",
+    "companies_house_ixbrl_url": "string", "companies_house_pdf_url": "string",
+    "rows": {"type": "array", "items": {
+      "section": "string", "label": "string", "current_value": "number", "previous_value": "number",
+      "is_detail": "boolean", "transactions_url": {"type": "string", "nullable": true}
+    }}
+  }},
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' ? 0 : ($neg := $contains($v, '(') or $contains($v, '-'); $n := $number($replace($replace($replace($replace($replace($v, /£/, ''), /,/, ''), /\\(/, ''), /\\)/, ''), /-/, '')); $neg ? -$n : $n)) }"},
+  "effects": {"reads": ["FreeAgent account detailed Final Accounts report"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {"kind": "dom", "fields": {
+      "accounting_year": {"selector": "[data-testid='dfd-final-accounts'] button [data-testid='icon-text']"},
+      "current_year": {"selector": "#income-statement thead tr:first-child th:nth-child(2)"},
+      "previous_year": {"selector": "#income-statement thead tr:first-child th:nth-child(3)"},
+      "status": {"selector": "aside .fe-Badge"},
+      "settings": {"selector": "a[href$='/edit'][href^='/accounting/final_accounts/']", "attr": "href"},
+      "full_ixbrl": {"selector": "a[href='/accounting/final_accounts/{end_date}.xhtml']", "attr": "href"},
+      "full_pdf": {"selector": "a[href='/accounting/final_accounts/{end_date}.pdf']", "attr": "href"},
+      "abbr_ixbrl": {"selector": "a[href*='{end_date}.xhtml?abbreviated=true']", "attr": "href"},
+      "abbr_pdf": {"selector": "a[href*='{end_date}.pdf?abbreviated=true']", "attr": "href"}
+    }, "post": "{'end_date': $end_date, 'accounting_year': $trim($substringAfter(accounting_year, 'Accounting year ')), 'current_year': current_year, 'previous_year': previous_year, 'status': status, 'settings_url': settings, 'full_ixbrl_url': full_ixbrl, 'full_pdf_url': full_pdf, 'companies_house_ixbrl_url': abbr_ixbrl, 'companies_house_pdf_url': abbr_pdf}"},
+    {"kind": "dom", "item": "#income-statement tbody tr, #balance-sheet tbody tr", "fields": {
+      "section": {"selector": "caption h2", "scope": "table"},
+      "label": {"selector": "th:first-child, td:first-child"},
+      "classes": {"selector": ":self", "attr": "class"},
+      "url": {"selector": "th:first-child a, td:first-child a", "attr": "href"},
+      "current_1": {"selector": "td:nth-child(2)"}, "current_2": {"selector": "td:nth-child(3)"},
+      "previous_1": {"selector": "td:nth-child(4)"}, "previous_2": {"selector": "td:nth-child(5)"}
+    }, "post": "{'rows': $.{'section': $trim($substringAfter(section, 'Final accounts - ')), 'label': $trim($replace(label, /\\s*\\(toggle additional rows\\)/, '')), 'current_value': $money(current_1) + $money(current_2), 'previous_value': $money(previous_1) + $money(previous_2), 'is_detail': $contains(classes, '--groupItem'), 'transactions_url': url ? url : null}}"
+    }
+  ]
+}

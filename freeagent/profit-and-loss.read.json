@@ -1,0 +1,47 @@
+{
+  "name": "@djgrant/freeagent/profit-and-loss",
+  "description": "Reads FreeAgent's current profit and loss report.",
+  "url": "https://{account}.freeagent.com/accounting/restore_profit_and_loss",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "period": "string",
+      "csv_url": "string",
+      "lines": {
+        "type": "array",
+        "items": {
+          "label": "string",
+          "kind": "string",
+          "code": {"type": "string", "nullable": true},
+          "debit": {"type": "number", "nullable": true},
+          "credit": {"type": "number", "nullable": true},
+          "total": {"type": "number", "nullable": true}
+        }
+      }
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' or $v = 'N/A' ? null : ($neg := $contains($v, '-') or $contains($v, '('); $n := $number($replace($replace($replace($replace($replace($v, /-/, ''), /£/, ''), /,/, ''), /\\(/, ''), /\\)/, '')); $neg ? -$n : $n)) }"},
+  "effects": {"reads": ["FreeAgent account profit and loss report"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {"csv_href": {"selector": "a[href^='/accounting/profit_and_loss/'][href$='.csv']", "attr": "href"}},
+      "post": "{'period': $match(csv_href, /profit_and_loss\\/([^./]+)\\.csv/).groups[0], 'csv_url': csv_href}"
+    },
+    {
+      "kind": "dom",
+      "item": "#yearly_pl tbody tr, #yearly_pl tfoot tr",
+      "fields": {
+        "class": {"selector": ":self", "attr": "class"},
+        "label": {"selector": "th:nth-child(1), td:nth-child(1)"},
+        "csv_label": {"selector": "th:nth-child(1), td:nth-child(1)", "attr": "data-csv-cell-contents"},
+        "href": {"selector": "th:nth-child(1) a, td:nth-child(1) a", "attr": "href"},
+        "value1": {"selector": "td:nth-child(2)"},
+        "value2": {"selector": "td:nth-child(3)"}
+      },
+      "post": "{'lines': $.{'label': $replace($replace(csv_label ? csv_label : label, /^(add|less) /, ''), /\\s*\\(toggle additional rows\\)$/, ''), 'kind': $contains(class, 'groupItem') ? 'account' : ($contains(class, 'groupHeader') ? 'group' : 'total'), 'code': $contains(class, 'groupItem') ? $match(href, /show_transactions\\/[^/]+\\/([^?]+)/).groups[0] : null, 'debit': $contains(class, 'groupItem') or $contains(class, 'groupHeader') ? $money(value1) : null, 'credit': $contains(class, 'groupItem') or $contains(class, 'groupHeader') ? $money(value2) : null, 'total': $not($contains(class, 'groupItem')) and $not($contains(class, 'groupHeader')) ? $money(value1) : null}}"
+    }
+  ]
+}

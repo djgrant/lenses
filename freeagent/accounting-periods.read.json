@@ -1,0 +1,35 @@
+{
+  "name": "@djgrant/freeagent/accounting-periods",
+  "description": "Reads the accounting periods available in FreeAgent's End of Year area.",
+  "url": "https://{account}.freeagent.com/accounting/end_of_year",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "current_end_date": "string",
+      "periods": {
+        "type": "array",
+        "items": {
+          "accounting_year": "string",
+          "end_date": "string",
+          "url": "string"
+        }
+      }
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "effects": {"reads": ["FreeAgent account accounting periods"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {"canonical": {"selector": "a[href^='/accounting/end_of_year/'][href]:not([href*='?']):not([href$='.pdf']):not([href$='/approve'])", "attr": "href"}},
+      "post": "{'current_end_date': $match(canonical, /end_of_year\\/([0-9]{4}-[0-9]{2}-[0-9]{2})/).groups[0]}"
+    },
+    {
+      "kind": "dom",
+      "item": ".fe-PageHeader-titleDropdownPopover a[href^='/accounting/end_of_year/']",
+      "fields": {"accounting_year": {"selector": ":self"}, "href": {"selector": ":self", "attr": "href"}},
+      "post": "{'periods': $.{'accounting_year': $trim($substringAfter(accounting_year, 'End of Year ')), 'end_date': $match(href, /end_of_year\\/([0-9]{4}-[0-9]{2}-[0-9]{2})/).groups[0], 'url': href}}"
+    }
+  ]
+}

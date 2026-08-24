@@ -1,0 +1,26 @@
+{
+  "name": "@djgrant/freeagent/update-final-account-current-year",
+  "description": "Replaces the Current year tab values and notes in FreeAgent Final Accounts settings.",
+  "url": "https://{account}.freeagent.com/accounting/final_accounts/{end_date}/edit",
+  "params": {
+    "end_date": "string", "employee_average": "integer",
+    "capital_commitments_note": "string", "contingent_liabilities_note": "string",
+    "director_advances_credits_note": "string", "director_guarantees_note": "string", "financial_commitments_note": "string"
+  },
+  "returns": {"type": "object", "fields": {"saved": "boolean", "end_date": "string", "report_url": "string"}},
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "effects": {"reads": ["FreeAgent account Final Accounts settings"], "writes": ["FreeAgent account Final Accounts current-year employee average and notes"], "idempotent": false, "cache": 0},
+  "perform": [
+    {"wait": {"appears": "#edit_final_accounts_report"}},
+    {"fill": "#final_accounts_report_report_values_attributes_0_manual_current_value", "value": "$string($employee_average)"},
+    {"fill": "#final_accounts_report_report_notes_attributes_0_content", "value": "$capital_commitments_note"},
+    {"fill": "#final_accounts_report_report_notes_attributes_1_content", "value": "$contingent_liabilities_note"},
+    {"fill": "#final_accounts_report_report_notes_attributes_2_content", "value": "$director_advances_credits_note"},
+    {"fill": "#final_accounts_report_report_notes_attributes_3_content", "value": "$director_guarantees_note"},
+    {"fill": "#final_accounts_report_report_notes_attributes_4_content", "value": "$financial_commitments_note"},
+    {"click": "#edit_final_accounts_report input[type='submit']"},
+    {"wait": {"gone": "#edit_final_accounts_report", "timeoutMs": 30000}}
+  ],
+  "resolve": [{"kind": "dom", "fields": {"report": {"selector": "a[href='/accounting/final_accounts/{end_date}']", "attr": "href"}}, "post": "{'saved': true, 'end_date': $end_date, 'report_url': report ? report : ('https://' & $account & '.freeagent.com') & '/accounting/final_accounts/' & $end_date}"}]
+}

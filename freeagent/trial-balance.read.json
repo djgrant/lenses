@@ -1,0 +1,46 @@
+{
+  "name": "@djgrant/freeagent/trial-balance",
+  "description": "Reads FreeAgent's current trial balance.",
+  "url": "https://{account}.freeagent.com/accounting/trial_balance",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "as_at": "string",
+      "period": "string",
+      "accounts": {
+        "type": "array",
+        "items": {
+          "code": "string",
+          "account": "string",
+          "debit": {"type": "number", "nullable": true},
+          "credit": {"type": "number", "nullable": true}
+        }
+      }
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { $trim($s) = '' ? null : $number($replace($s, /,/, '')) }"},
+  "effects": {"reads": ["FreeAgent account trial balance"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "title": {"selector": "title"},
+        "csv_href": {"selector": "a[href^='/accounting/trial_balance/'][href$='.csv']", "attr": "href"}
+      },
+      "post": "{'as_at': $trim($substringAfter(title, 'Trial Balance as at')), 'period': $match(csv_href, /trial_balance\\/([^./]+)\\.csv/).groups[0]}"
+    },
+    {
+      "kind": "dom",
+      "item": "table.fe-DataTable-table tbody tr:has(a[href*='/accounting/show_transactions/'])",
+      "fields": {
+        "label": {"selector": "td:nth-child(1)"},
+        "href": {"selector": "td:nth-child(1) a", "attr": "href"},
+        "debit": {"selector": "td:nth-child(2)"},
+        "credit": {"selector": "td:nth-child(3)"}
+      },
+      "post": "{'accounts': $.{'code': $match(href, /show_transactions\\/[^/]+\\/([^?]+)/).groups[0], 'account': $trim($substringAfter(label, ' ')), 'debit': $money(debit), 'credit': $money(credit)}}"
+    }
+  ]
+}

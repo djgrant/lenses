@@ -1,0 +1,71 @@
+{
+  "name": "@djgrant/freeagent/add-opening-balance",
+  "description": "Adds a non-bank debit or credit line to FreeAgent's opening balances.",
+  "url": "https://{account}.freeagent.com/accounting/journal_sets/{journal_set_id}/edit",
+  "params": {
+    "journal_set_id": {
+      "type": "integer",
+      "default": {
+        "$lens": "@djgrant/freeagent/opening-balances",
+        "field": "journal_set_id"
+      }
+    },
+    "code": "string",
+    "information": "string",
+    "side": {
+      "type": "string",
+      "enum": ["debit", "credit"]
+    },
+    "amount": "number"
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "saved": "boolean",
+      "journal_set_id": "integer",
+      "code": "string",
+      "information": "string",
+      "side": "string",
+      "amount": "number",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "Sign in to your FreeAgent account, then retry."
+    }
+  },
+  "detect": {
+    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"
+  },
+  "effects": {
+    "reads": [
+      "FreeAgent account opening-balance editor"
+    ],
+    "writes": [
+      "FreeAgent account (adds an opening-balance journal line)"
+    ],
+    "idempotent": false,
+    "cache": 0
+  },
+  "perform": [
+    { "wait": { "appears": "#journal_set" } },
+    {
+      "submit": "#journal_set",
+      "form": {
+        "journal_set[journal_entries_attributes][9999999999999][code]": "$code",
+        "journal_set[journal_entries_attributes][9999999999999][description]": "$information",
+        "journal_set[journal_entries_attributes][9999999999999][debit_value]": "$string($side = 'debit' ? $amount : -$amount)",
+        "commit": "'Save Changes'"
+      }
+    },
+    { "wait": { "gone": "#journal_set", "timeoutMs": 30000 } }
+  ],
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": { "heading": { "selector": "h1" } },
+      "post": "{ 'saved': true, 'journal_set_id': $journal_set_id, 'code': $code, 'information': $information, 'side': $side, 'amount': $amount, 'confirmation': heading }"
+    }
+  ]
+}

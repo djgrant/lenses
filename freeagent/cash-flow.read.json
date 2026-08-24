@@ -1,0 +1,65 @@
+{
+  "name": "@djgrant/freeagent/cash-flow",
+  "description": "Reads FreeAgent's cash-flow forecast summary, daily balances, predicted incoming/outgoing events, and exports.",
+  "url": "https://{account}.freeagent.com/banking/cashflow",
+  "params": {"forecast_limit": {"type": "integer", "default": 100}, "event_limit": {"type": "integer", "default": 50}},
+  "returns": {
+    "type": "object",
+    "fields": {
+      "included_bank_accounts": "string",
+      "todays_balance": "number",
+      "incoming_next_90_days": "number",
+      "outgoing_next_90_days": "number",
+      "predicted_balance_90_days": "number",
+      "csv_url": "string",
+      "pdf_url": "string",
+      "forecast": {"type": "array", "items": {"date": "string", "balance": "number"}},
+      "events": {"type": "array", "items": {
+        "direction": "string", "date": "string", "description": "string", "amount": "number",
+        "category": "string", "status": "string", "url": {"type": "string", "nullable": true},
+        "recurring": "boolean", "predicted": "boolean"
+      }}
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $trim($s); $neg := $contains($v, '-'); $n := $number($replace($replace($replace($v, /£/, ''), /,/, ''), /-/, '')); $neg ? -$n : $n) }"},
+  "effects": {"reads": ["FreeAgent account cash-flow forecast"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "accounts": {"selector": "#cashflow-horizon-chart header .fe-u-textColor--light"},
+        "balance": {"selector": "[data-charts--cashflow-horizon-chart-target='balance']"},
+        "incoming": {"selector": "[data-charts--cashflow-horizon-chart-target='incoming']"},
+        "outgoing": {"selector": "[data-charts--cashflow-horizon-chart-target='outgoing']"},
+        "predicted": {"selector": "[data-charts--cashflow-horizon-chart-target='predicted']"},
+        "csv": {"selector": "[data-testid='export_report'] a[data-testid='csv']", "attr": "href"},
+        "pdf": {"selector": "[data-testid='export_report'] a[data-testid='pdf']", "attr": "href"}
+      },
+      "post": "{'included_bank_accounts': accounts, 'todays_balance': $money(balance), 'incoming_next_90_days': $money(incoming), 'outgoing_next_90_days': $money(outgoing), 'predicted_balance_90_days': $money(predicted), 'csv_url': csv, 'pdf_url': pdf}"
+    },
+    {
+      "kind": "dom",
+      "item": "#cashflow-horizon-chart table tbody tr",
+      "fields": {"date": {"selector": "td:nth-child(1)"}, "balance": {"selector": "td:nth-child(2)"}},
+      "post": "{'forecast': [$.{'date': date, 'balance': $money(balance)}][[0..$forecast_limit - 1]]}"
+    },
+    {
+      "kind": "dom",
+      "item": "#cashflow-incoming-panel .fe-DashboardSummary-item[data-line-item-date], #cashflow-outgoing-panel .fe-DashboardSummary-item[data-line-item-date]",
+      "fields": {
+        "panel_id": {"selector": ":self", "scope": ".fe-DashboardPanel", "attr": "id"},
+        "date": {"selector": ":self", "attr": "data-line-item-date"},
+        "description": {"selector": ".fe-DashboardSummary-title"},
+        "href": {"selector": ".fe-DashboardSummary-title a", "attr": "href"},
+        "amount": {"selector": ".fe-DashboardSummary-row:first-child .fe-DashboardSummary-unit span:last-child"},
+        "category": {"selector": ".fe-DashboardSummary-row:nth-child(2) .fe-DashboardSummary-meta"},
+        "status": {"selector": ".fe-DashboardSummary-status"},
+        "recurring_icon": {"selector": "[data-icon='arrow_roundel']"},
+        "predicted_icon": {"selector": "[data-icon='predicted_event']"}
+      },
+      "post": "{'events': [$.{'direction': $contains(panel_id, 'incoming') ? 'incoming' : 'outgoing', 'date': date, 'description': description, 'amount': $money(amount), 'category': category, 'status': status, 'url': href ? href : null, 'recurring': recurring_icon != null, 'predicted': predicted_icon != null}][[0..$event_limit - 1]]}"
+    }
+  ]
+}

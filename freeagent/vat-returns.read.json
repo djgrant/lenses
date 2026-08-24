@@ -1,0 +1,27 @@
+{
+  "name": "@djgrant/freeagent/vat-returns",
+  "description": "Reads FreeAgent VAT returns and running balances.",
+  "url": "https://{account}.freeagent.com/tax/vat_returns",
+  "returns": {"type": "object", "fields": {"returns": {"type": "array", "items": {
+    "dated_on": "string", "description": "string", "due_on": "string",
+    "liability": "number", "payment": {"type": "number", "nullable": true},
+    "balance_due": "number", "url": "string"
+  }}}},
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' ? null : ($neg := $contains($v, '-'); $n := $number($replace($replace($replace($v, /-/, ''), /£/, ''), /,/, '')); $neg ? -$n : $n)) }"},
+  "effects": {"reads": ["FreeAgent account VAT returns"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [{
+    "kind": "dom",
+    "item": "table.Table tbody tr:has(a[href^='/tax/vat_returns/'])",
+    "fields": {
+      "dated_on": {"selector": "td:nth-child(1)"},
+      "description": {"selector": "td:nth-child(2)"},
+      "href": {"selector": "td:nth-child(2) a", "attr": "href"},
+      "liability": {"selector": "td:nth-child(3)"},
+      "payment": {"selector": "td:nth-child(4)"},
+      "balance_due": {"selector": "td:nth-child(5)"}
+    },
+    "post": "{'returns': $.{'dated_on': dated_on, 'description': description, 'due_on': $trim($substringAfter(description, 'due by')), 'liability': $money(liability), 'payment': $money(payment), 'balance_due': $money(balance_due), 'url': href}}"
+  }]
+}

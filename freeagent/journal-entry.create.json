@@ -1,0 +1,65 @@
+{
+  "name": "@djgrant/freeagent/create-journal-entry",
+  "description": "Creates a balanced two-line FreeAgent journal.",
+  "url": "https://{account}.freeagent.com/accounting/journal_sets/new",
+  "params": {
+    "description": "string",
+    "date": "string",
+    "debit_code": "string",
+    "debit_description": "string",
+    "credit_code": "string",
+    "credit_description": "string",
+    "amount": "number"
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "created": "boolean",
+      "description": "string",
+      "date": "string",
+      "debit_code": "string",
+      "debit_description": "string",
+      "credit_code": "string",
+      "credit_description": "string",
+      "amount": "number",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": { "hint": "Sign in to your FreeAgent account, then retry." }
+  },
+  "detect": {
+    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"
+  },
+  "effects": {
+    "reads": ["FreeAgent account journal-entry form and creation result"],
+    "writes": ["FreeAgent account (creates a posted two-line journal entry)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "perform": [
+    { "wait": { "appears": "#journal_set" } },
+    {
+      "submit": "#journal_set",
+      "form": {
+        "journal_set[description]": "$description",
+        "journal_set[dated_on]": "$date",
+        "journal_set[journal_entries_attributes][0][code]": "$debit_code",
+        "journal_set[journal_entries_attributes][0][debit_value]": "$string($amount)",
+        "journal_set[journal_entries_attributes][0][description]": "$debit_description",
+        "journal_set[journal_entries_attributes][1][code]": "$credit_code",
+        "journal_set[journal_entries_attributes][1][debit_value]": "$string(-$amount)",
+        "journal_set[journal_entries_attributes][1][description]": "$credit_description",
+        "commit": "'Create Journal Entries'"
+      }
+    },
+    { "wait": { "gone": "#journal_set", "timeoutMs": 30000 } }
+  ],
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": { "heading": { "selector": "h1" } },
+      "post": "{ 'created': true, 'description': $description, 'date': $date, 'debit_code': $debit_code, 'debit_description': $debit_description, 'credit_code': $credit_code, 'credit_description': $credit_description, 'amount': $amount, 'confirmation': heading }"
+    }
+  ]
+}
