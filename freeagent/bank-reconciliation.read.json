@@ -1,0 +1,31 @@
+{
+  "name": "@djgrant/freeagent/bank-reconciliation",
+  "description": "Reads FreeAgent's current bank reconciliation summary, account choices, unexplained totals, difference, and exports.",
+  "url": "https://{account}.freeagent.com/accounting/bank_reconciliation",
+  "returns": {"type": "object", "fields": {
+    "period": "string", "bank_id": "string", "bank_account": "string", "date_range": "string",
+    "unexplained_money_in": "number", "unexplained_money_out": "number", "difference": "number", "is_reconciled": "boolean",
+    "summary_url": "string", "full_report_url": "string", "csv_url": "string", "pdf_url": "string",
+    "bank_accounts": {"type": "array", "items": {"id": "string", "name": "string", "currency_symbol": "string"}},
+    "rows": {"type": "array", "items": {"label": "string", "amount": "number", "url": {"type": "string", "nullable": true}}}
+  }},
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' ? 0 : $number($replace($replace($v, /£/, ''), /,/, ''))) }"},
+  "effects": {"reads": ["FreeAgent account bank reconciliation"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {"kind": "dom", "fields": {
+      "summary": {"selector": ".fe-Tabs a[href^='/accounting/bank_reconciliation/']", "attr": "href"},
+      "full": {"selector": ".fe-Tabs a[href^='/accounting/bank_reconciliation_full_report/']", "attr": "href"},
+      "account": {"selector": "#bank_account option:checked"},
+      "range": {"selector": ".fe-Report-documentHeader p"},
+      "csv": {"selector": "a[href^='/accounting/bank_reconciliation/'][href$='.csv']", "attr": "href"},
+      "pdf": {"selector": "a[href^='/accounting/bank_reconciliation/'][href$='.pdf']", "attr": "href"},
+      "unexplained_in": {"selector": ".fe-Report-documentBody tbody tr:nth-child(7) td:nth-child(2)"},
+      "unexplained_out": {"selector": ".fe-Report-documentBody tbody tr:nth-child(8) td:nth-child(2)"},
+      "difference": {"selector": "#balance_difference"}
+    }, "post": "($m := $match(summary, /bank_reconciliation\\/([^/]+)\\/([^/?]+)/); $d := $money(difference); {'period': $m.groups[0], 'bank_id': $m.groups[1], 'bank_account': account, 'date_range': range, 'unexplained_money_in': $money(unexplained_in), 'unexplained_money_out': $money(unexplained_out), 'difference': $d, 'is_reconciled': $d = 0, 'summary_url': summary, 'full_report_url': full, 'csv_url': csv, 'pdf_url': pdf})"},
+    {"kind": "dom", "item": "#bank_account option", "fields": {"id": {"selector": ":self", "attr": "value"}, "name": {"selector": ":self"}, "symbol": {"selector": ":self", "attr": "data-symbol"}}, "post": "{'bank_accounts': $.{'id': id, 'name': name, 'currency_symbol': symbol}}"},
+    {"kind": "dom", "item": ".fe-Report-documentBody tbody tr", "fields": {"label": {"selector": "td:nth-child(1)"}, "href": {"selector": "td:nth-child(1) a", "attr": "href"}, "amount_1": {"selector": "td:nth-child(2)"}, "amount_2": {"selector": "td:nth-child(3)"}}, "post": "{'rows': $.{'label': label, 'amount': $trim(amount_2) != '' ? $money(amount_2) : $money(amount_1), 'url': href ? href : null}}"}
+  ]
+}

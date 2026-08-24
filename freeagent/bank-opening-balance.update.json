@@ -1,0 +1,49 @@
+{
+  "name": "@djgrant/freeagent/set-bank-opening-balance",
+  "description": "Sets a FreeAgent bank account's opening balance.",
+  "url": "https://{account}.freeagent.com/bank_accounts/{bank_account_id}/edit",
+  "params": {
+    "bank_account_id": "integer",
+    "balance": "number"
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "saved": "boolean",
+      "bank_account_id": "integer",
+      "balance": "number",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "Sign in to your FreeAgent account, then retry."
+    }
+  },
+  "detect": {
+    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"
+  },
+  "effects": {
+    "reads": [
+      "FreeAgent account bank-account details"
+    ],
+    "writes": [
+      "FreeAgent account (sets a bank account's opening balance)"
+    ],
+    "idempotent": false,
+    "cache": 0
+  },
+  "perform": [
+    { "wait": { "appears": "#bank_account_opening_balance" } },
+    { "fill": "#bank_account_opening_balance", "value": "$string($balance)" },
+    { "click": "form[action^='/bank_accounts/'] button[type='submit']" },
+    { "wait": { "gone": "#bank_account_opening_balance", "timeoutMs": 30000 } }
+  ],
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": { "heading": { "selector": "h1" } },
+      "post": "{ 'saved': true, 'bank_account_id': $bank_account_id, 'balance': $balance, 'confirmation': heading }"
+    }
+  ]
+}

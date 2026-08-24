@@ -1,0 +1,49 @@
+{
+  "name": "@djgrant/freeagent/ct600",
+  "description": "Reads the full box-by-box contents and status of a FreeAgent CT600 return.",
+  "url": "https://{account}.freeagent.com/tax/corporation_tax_returns/{period}/ct600",
+  "params": {"period": "string"},
+  "returns": {
+    "type": "object",
+    "fields": {
+      "period": "string",
+      "accounting_year": "string",
+      "return_date_range": "string",
+      "status": "string",
+      "total_amount_due": "number",
+      "filing_due": "string",
+      "payment_due": "string",
+      "computations_url": "string",
+      "computations_ixbrl_url": {"type": "string", "nullable": true},
+      "ct600_pdf_url": "string",
+      "boxes": {"type": "array", "items": {"box": "string", "label": "string", "value": "string"}}
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $trim($s); $neg := $contains($v, '(') or $contains($v, '-'); $n := $number($replace($replace($replace($replace($replace($v, /£/, ''), /,/, ''), /\\(/, ''), /\\)/, ''), /-/, '')); $neg ? -$n : $n) }"},
+  "effects": {"reads": ["FreeAgent account CT600 contents"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "heading": {"selector": ".fe-PageHeader-title .fe-u-truncate"},
+        "date_range": {"selector": "#date_header"},
+        "amount": {"selector": "#tax_chargeable"},
+        "status": {"selector": "[data-testid='submission-status']"},
+        "filing_due": {"selector": "#return_due_on", "attr": "datetime"},
+        "payment_due": {"selector": "#payment_due_on", "attr": "datetime"},
+        "tax_end": {"selector": "#period_ends_on", "attr": "datetime"},
+        "computations": {"selector": ".fe-SectionNavigation a:not([href$='/ct600'])", "attr": "href"},
+        "ixbrl": {"selector": "a[href$='/computations_ixbrl']", "attr": "href"}
+      },
+      "post": "{'period': $period, 'accounting_year': $trim($substringAfter(heading, 'Corporation Tax Return for ')), 'return_date_range': date_range, 'status': status, 'total_amount_due': $money(amount), 'filing_due': filing_due, 'payment_due': payment_due, 'computations_url': computations, 'computations_ixbrl_url': ixbrl ? ixbrl : null, 'ct600_pdf_url': ('https://' & $account & '.freeagent.com') & '/accounting/end_of_year/' & tax_end & '.pdf?ct600_date=' & tax_end & '&view=ct600'}"
+    },
+    {
+      "kind": "dom",
+      "item": "li:has(> .hmrc_box)",
+      "fields": {"box": {"selector": ".hmrc_box"}, "label": {"selector": ".hmrc_label"}, "value": {"selector": ".hmrc_data"}},
+      "post": "{'boxes': $.{'box': box, 'label': label, 'value': value}}"
+    }
+  ]
+}

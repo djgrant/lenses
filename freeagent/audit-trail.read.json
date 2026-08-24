@@ -1,0 +1,21 @@
+{
+  "name": "@djgrant/freeagent/audit-trail",
+  "description": "Reads FreeAgent audit-trail entries with full item names and history links.",
+  "url": "https://{account}.freeagent.com/accounting/audit_trail?page={page}&per_page=100",
+  "params": {"page": {"type": "integer", "default": 1}, "limit": {"type": "integer", "default": 25}},
+  "returns": {"type": "object", "fields": {
+    "page": "integer", "next_url": {"type": "string", "nullable": true},
+    "entries": {"type": "array", "items": {
+      "date": "string", "user": "string", "item_type": "string", "item": "string",
+      "action": "string", "history_url": {"type": "string", "nullable": true}
+    }}
+  }},
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "effects": {"reads": ["FreeAgent account audit trail"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {"kind": "dom", "fields": {"next": {"selector": "#freestyle_pager a[rel='next']", "attr": "href"}}, "post": "{'page': $page, 'next_url': next ? next : null}"},
+    {"kind": "dom", "item": "main table.Table tbody tr", "fields": {"date": {"selector": "td:nth-child(1)"}, "user": {"selector": "td:nth-child(2)"}, "item_type": {"selector": "td:nth-child(3)"}, "item_title": {"selector": "td:nth-child(4) [title]", "attr": "title"}, "item_text": {"selector": "td:nth-child(4)"}, "action": {"selector": "td:nth-child(5)"}, "history": {"selector": "td:nth-child(6) a[href^='/accounting/audit_trail/']", "attr": "href"}}, "post": "{'entries': [$.{'date': date, 'user': user, 'item_type': item_type, 'item': item_title ? item_title : item_text, 'action': action, 'history_url': history ? history : null}][[0..$limit - 1]]}"
+    }
+  ]
+}

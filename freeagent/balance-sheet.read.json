@@ -1,0 +1,49 @@
+{
+  "name": "@djgrant/freeagent/balance-sheet",
+  "description": "Reads FreeAgent's current balance sheet.",
+  "url": "https://{account}.freeagent.com/accounting/restore_balance_sheet",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "as_at": "string",
+      "period": "string",
+      "csv_url": "string",
+      "lines": {
+        "type": "array",
+        "items": {
+          "label": "string",
+          "kind": "string",
+          "code": {"type": "string", "nullable": true},
+          "debit": {"type": "number", "nullable": true},
+          "credit": {"type": "number", "nullable": true}
+        }
+      }
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' or $v = 'N/A' ? null : ($neg := $contains($v, '-') or $contains($v, '('); $n := $number($replace($replace($replace($replace($replace($v, /-/, ''), /£/, ''), /,/, ''), /\\(/, ''), /\\)/, '')); $neg ? -$n : $n)) }"},
+  "effects": {"reads": ["FreeAgent account balance sheet"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "title": {"selector": "title"},
+        "csv_href": {"selector": "a[href^='/accounting/balance_sheet/'][href$='.csv']", "attr": "href"}
+      },
+      "post": "{'as_at': $trim($substringAfter(title, 'Balance Sheet at')), 'period': $match(csv_href, /balance_sheet\\/([^./]+)\\.csv/).groups[0], 'csv_url': csv_href}"
+    },
+    {
+      "kind": "dom",
+      "item": "#balance_sheet tbody tr, #balance_sheet tfoot tr",
+      "fields": {
+        "class": {"selector": ":self", "attr": "class"},
+        "testid": {"selector": ":self", "attr": "data-testid"},
+        "label": {"selector": "th:nth-child(1), td:nth-child(1)"},
+        "debit": {"selector": "td:nth-child(2)"},
+        "credit": {"selector": "td:nth-child(3)"}
+      },
+      "post": "{'lines': $.{'label': $replace($replace(label, /^less /, ''), /\\s*\\(toggle additional rows\\)$/, ''), 'kind': $contains(class, 'groupItem') ? 'account' : ($contains(class, 'groupHeader') ? 'group' : ($contains(class, 'highlighted') ? 'section' : 'total')), 'code': testid ? $substringAfter(testid, 'code-') : null, 'debit': $money(debit), 'credit': $money(credit)}}"
+    }
+  ]
+}

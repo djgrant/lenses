@@ -1,0 +1,39 @@
+{
+  "name": "@djgrant/freeagent/update-final-account-previous-year",
+  "description": "Replaces the Previous year comparative tab values in FreeAgent Final Accounts settings.",
+  "url": "https://{account}.freeagent.com/accounting/final_accounts/{end_date}/edit",
+  "params": {
+    "end_date": "string", "turnover": "number", "other_income": "number", "cost_of_sales": "number",
+    "staff_costs": "number", "depreciation": "number", "other_charges": "number", "tax": "number",
+    "called_up_share_capital_not_paid": "number", "fixed_assets": "number", "current_assets": "number",
+    "prepayments_and_accrued_income": "number", "creditors_within_one_year": "number",
+    "creditors_after_one_year": "number", "provisions_for_liabilities": "number",
+    "accruals_and_deferred_income": "number", "employee_average": "integer"
+  },
+  "returns": {"type": "object", "fields": {"saved": "boolean", "end_date": "string", "report_url": "string"}},
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "effects": {"reads": ["FreeAgent account Final Accounts settings"], "writes": ["FreeAgent account Final Accounts previous-year comparative values"], "idempotent": false, "cache": 0},
+  "perform": [
+    {"wait": {"appears": "#edit_final_accounts_report"}},
+    {"fill": "#final_accounts_report_report_values_attributes_1_manual_comparative_value", "value": "$string($turnover)"},
+    {"fill": "#final_accounts_report_report_values_attributes_2_manual_comparative_value", "value": "$string($other_income)"},
+    {"fill": "#final_accounts_report_report_values_attributes_3_manual_comparative_value", "value": "$string($cost_of_sales)"},
+    {"fill": "#final_accounts_report_report_values_attributes_4_manual_comparative_value", "value": "$string($staff_costs)"},
+    {"fill": "#final_accounts_report_report_values_attributes_5_manual_comparative_value", "value": "$string($depreciation)"},
+    {"fill": "#final_accounts_report_report_values_attributes_6_manual_comparative_value", "value": "$string($other_charges)"},
+    {"fill": "#final_accounts_report_report_values_attributes_7_manual_comparative_value", "value": "$string($tax)"},
+    {"fill": "#final_accounts_report_report_values_attributes_8_manual_comparative_value", "value": "$string($called_up_share_capital_not_paid)"},
+    {"fill": "#final_accounts_report_report_values_attributes_9_manual_comparative_value", "value": "$string($fixed_assets)"},
+    {"fill": "#final_accounts_report_report_values_attributes_10_manual_comparative_value", "value": "$string($current_assets)"},
+    {"fill": "#final_accounts_report_report_values_attributes_11_manual_comparative_value", "value": "$string($prepayments_and_accrued_income)"},
+    {"fill": "#final_accounts_report_report_values_attributes_12_manual_comparative_value", "value": "$string($creditors_within_one_year)"},
+    {"fill": "#final_accounts_report_report_values_attributes_13_manual_comparative_value", "value": "$string($creditors_after_one_year)"},
+    {"fill": "#final_accounts_report_report_values_attributes_14_manual_comparative_value", "value": "$string($provisions_for_liabilities)"},
+    {"fill": "#final_accounts_report_report_values_attributes_15_manual_comparative_value", "value": "$string($accruals_and_deferred_income)"},
+    {"fill": "#final_accounts_report_report_values_attributes_16_manual_comparative_value", "value": "$string($employee_average)"},
+    {"click": "#edit_final_accounts_report input[type='submit']"},
+    {"wait": {"gone": "#edit_final_accounts_report", "timeoutMs": 30000}}
+  ],
+  "resolve": [{"kind": "dom", "fields": {"report": {"selector": "a[href='/accounting/final_accounts/{end_date}']", "attr": "href"}}, "post": "{'saved': true, 'end_date': $end_date, 'report_url': report ? report : ('https://' & $account & '.freeagent.com') & '/accounting/final_accounts/' & $end_date}"}]
+}

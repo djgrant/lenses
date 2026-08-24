@@ -1,0 +1,40 @@
+{
+  "name": "@djgrant/freeagent/final-accounts",
+  "description": "Reads FreeAgent final-account periods and headline figures.",
+  "url": "https://{account}.freeagent.com/accounting/final_accounts",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "accounts": {
+        "type": "array",
+        "items": {
+          "accounting_year": "string",
+          "date_range": "string",
+          "turnover": "number",
+          "profit_after_tax": "number",
+          "tax_due": "number",
+          "url": "string"
+        }
+      }
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $trim($s); $neg := $contains($v, '-'); $n := $number($replace($replace($replace($v, /-/, ''), /£/, ''), /,/, '')); $neg ? -$n : $n) }"},
+  "effects": {"reads": ["FreeAgent account final accounts"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "item": "#accounting-years tbody tr:has(a[href^='/accounting/final_accounts/'])",
+      "fields": {
+        "accounting_year": {"selector": "td:nth-child(1)"},
+        "href": {"selector": "td:nth-child(1) a", "attr": "href"},
+        "date_range": {"selector": "td:nth-child(2)"},
+        "turnover": {"selector": "td:nth-child(3)"},
+        "profit_after_tax": {"selector": "td:nth-child(4)"},
+        "tax_due": {"selector": "td:nth-child(5)"}
+      },
+      "post": "{'accounts': $.{'accounting_year': accounting_year, 'date_range': date_range, 'turnover': $money(turnover), 'profit_after_tax': $money(profit_after_tax), 'tax_due': $money(tax_due), 'url': href}}"
+    }
+  ]
+}

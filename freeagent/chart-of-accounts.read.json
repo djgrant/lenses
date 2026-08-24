@@ -1,0 +1,27 @@
+{
+  "name": "@djgrant/freeagent/chart-of-accounts",
+  "description": "Reads FreeAgent's complete chart of accounts.",
+  "url": "https://{account}.freeagent.com/accounting/trial_balance",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "accounts": {
+        "type": "array",
+        "items": {"code": "string", "name": "string"}
+      }
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "effects": {"reads": ["FreeAgent account chart of accounts"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "http",
+      "request": "GET https://{account}.freeagent.com/accounting/nominal_decode/free_agent.csv",
+      "credentials": true,
+      "headers": {"Cache-Control": "no-cache"},
+      "detect": {"needs_auth": "$contains(url, '/login') or $contains($string(body), 'Log in to your FreeAgent account')"},
+      "map": "($lines := $filter($split($string($), /\\r?\\n/), function($line) { $contains($line, ',') }); {'accounts': [$map($lines, function($line) { {'code': $trim($substringBefore($line, ',')), 'name': $trim($substringAfter($line, ','))} })]})"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "name": "@djgrant/freeagent/bank-account-balances",
+  "description": "Reads current balances for every FreeAgent bank account.",
+  "url": "https://{account}.freeagent.com/bank_accounts",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "accounts": {
+        "type": "array",
+        "items": {
+          "bank_account_id": "integer",
+          "name": "string",
+          "primary": "boolean",
+          "feed_status": "string",
+          "for_approval": "integer",
+          "unexplained": "integer",
+          "balance": "number",
+          "balance_date": "string"
+        }
+      }
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {
+    "count": "function($s) { $trim($s) = '' ? 0 : $number($match($s, /[0-9]+/).match) }",
+    "signedMoney": "function($s) { ($v := $match($s, /-?£[0-9,]+(?:\\.[0-9]+)?/).match; $n := $number($replace($replace($replace($v, /-/, ''), /£/, ''), /,/, '')); $contains($v, '-') ? -$n : $n) }"
+  },
+  "effects": {"reads": ["FreeAgent account bank-account balances"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "item": "table.Table tbody tr:has(a[href^='/bank_accounts/'])",
+      "fields": {
+        "name": {"selector": "td:nth-child(1) a[href^='/bank_accounts/']"},
+        "href": {"selector": "td:nth-child(1) a[href^='/bank_accounts/']", "attr": "href"},
+        "primary_marker": {"selector": "td:nth-child(1) [data-testid='icon-text']"},
+        "feed_status": {"selector": "td:nth-child(2)"},
+        "for_approval": {"selector": "td:nth-child(3)"},
+        "unexplained": {"selector": "td:nth-child(4)"},
+        "balance_text": {"selector": "td:nth-child(5)"}
+      },
+      "post": "{'accounts': $.{'bank_account_id': $number($match(href, /bank_accounts\\/([0-9]+)/).groups[0]), 'name': name, 'primary': primary_marker = 'Primary bank account', 'feed_status': $replace(feed_status, /\\s+/, ' '), 'for_approval': $count(for_approval), 'unexplained': $count(unexplained), 'balance': $signedMoney(balance_text), 'balance_date': $trim($match(balance_text, /Balance on\\s+(.+)/).groups[0])}}"
+    }
+  ]
+}

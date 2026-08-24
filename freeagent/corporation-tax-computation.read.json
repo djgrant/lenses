@@ -1,0 +1,64 @@
+{
+  "name": "@djgrant/freeagent/corporation-tax-computation",
+  "description": "Reads a FreeAgent Corporation Tax computation, including calculation rows and iXBRL/report links.",
+  "url": "https://{account}.freeagent.com/tax/corporation_tax_returns/{period}",
+  "params": {"period": "string"},
+  "returns": {
+    "type": "object",
+    "fields": {
+      "period": "string",
+      "accounting_year": "string",
+      "status": "string",
+      "total_amount_due": "number",
+      "filing_due": "string",
+      "payment_due": "string",
+      "accounting_start": "string",
+      "accounting_end": "string",
+      "tax_period_start": "string",
+      "tax_period_end": "string",
+      "profit_and_loss_url": {"type": "string", "nullable": true},
+      "computations_ixbrl_url": {"type": "string", "nullable": true},
+      "ct600_url": "string",
+      "rows": {"type": "array", "items": {
+        "section": "string", "label": "string",
+        "value_1": {"type": "string", "nullable": true},
+        "value_2": {"type": "string", "nullable": true}
+      }}
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' ? null : ($neg := $contains($v, '(') or $contains($v, '-'); $clean := $replace($replace($replace($replace($replace($v, /£/, ''), /,/, ''), /\\(/, ''), /\\)/, ''), /-/, ''); $n := $number($clean); $neg ? -$n : $n)) }"},
+  "effects": {"reads": ["FreeAgent account Corporation Tax computation"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "year": {"selector": "#year_ends option:checked"},
+        "amount": {"selector": "#tax_chargeable"},
+        "status": {"selector": "[data-testid='submission-status']"},
+        "filing_due": {"selector": "#return_due_on", "attr": "datetime"},
+        "payment_due": {"selector": "#payment_due_on", "attr": "datetime"},
+        "accounting_start": {"selector": "#year_end_period_starts_on", "attr": "datetime"},
+        "accounting_end": {"selector": "#year_end_period_ends_on", "attr": "datetime"},
+        "tax_start": {"selector": "#period_starts_on", "attr": "datetime"},
+        "tax_end": {"selector": "#period_ends_on", "attr": "datetime"},
+        "pnl": {"selector": "a[href^='/accounting/profit_and_loss/']", "attr": "href"},
+        "ixbrl": {"selector": "a[href$='/computations_ixbrl']", "attr": "href"},
+        "ct600": {"selector": ".fe-SectionNavigation a[href$='/ct600']", "attr": "href"}
+      },
+      "post": "{'period': $period, 'accounting_year': year, 'status': status, 'total_amount_due': $money(amount), 'filing_due': filing_due, 'payment_due': payment_due, 'accounting_start': accounting_start, 'accounting_end': accounting_end, 'tax_period_start': tax_start, 'tax_period_end': tax_end, 'profit_and_loss_url': pnl ? pnl : null, 'computations_ixbrl_url': ixbrl ? ixbrl : null, 'ct600_url': ct600}"
+    },
+    {
+      "kind": "dom",
+      "item": "table.computations_table tbody tr",
+      "fields": {
+        "section": {"selector": "h3.computations_table_header", "scope": ".fe-CardV2"},
+        "label": {"selector": "td:nth-child(1)"},
+        "amount_1": {"selector": "td:nth-child(2)"},
+        "amount_2": {"selector": "td:nth-child(3)"}
+      },
+      "post": "{'rows': $.{'section': section, 'label': label, 'value_1': amount_1, 'value_2': amount_2}}"
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "name": "@djgrant/freeagent/opening-balances",
+  "description": "Reads FreeAgent opening-balance lines and their journal-set ID.",
+  "url": "https://{account}.freeagent.com/accounting/journal_sets?ap=opening_balances",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "journal_set_id": "integer",
+      "edit_url": "string",
+      "balances": {
+        "type": "array",
+        "items": {
+          "row_id": "string",
+          "kind": "string",
+          "account": "string",
+          "information": "string",
+          "debit": { "type": "number", "nullable": true },
+          "credit": { "type": "number", "nullable": true },
+          "bank_account_id": { "type": "integer", "nullable": true },
+          "suspense": "boolean"
+        }
+      }
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "Sign in to your FreeAgent account, then retry."
+    }
+  },
+  "detect": {
+    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"
+  },
+  "helpers": {
+    "money": "function($s) { $trim($s) = '' ? null : $number($replace($s, /,/, '')) }"
+  },
+  "effects": {
+    "reads": [
+      "FreeAgent account opening balances"
+    ],
+    "writes": [],
+    "idempotent": true,
+    "cache": 0
+  },
+  "resolve": [
+    {
+      "kind": "http",
+      "request": "GET https://{account}.freeagent.com/accounting/journal_sets?ap=opening_balances",
+      "credentials": true,
+      "headers": {
+        "Cache-Control": "no-cache"
+      },
+      "detect": {
+        "needs_auth": "$contains(url, '/login') or $contains($string(body), 'Log in to your FreeAgent account')"
+      },
+      "map": "($html := $string($); $edit := $match($html, /href=\"(\/accounting\/journal_sets\/([0-9]+)\/edit)\"/); $rows := $match($html, /<tr class=\"([^\"]*(?:standard_bank_account|journal_entry)[^\"]*)\" id=\"([^\"]+)\">([\\s\\S]*?)<\\/tr>/); $text := function($s) { $trim($replace($replace($replace($s, /<[^>]+>/, ''), /&gt;/, '>'), /&amp;/, '&')) }; $htmlMoney := function($s) { ($v := $text($s); $v = '' ? null : $number($replace($v, /,/, ''))) }; { 'edit_url': ('https://' & $account & '.freeagent.com') & $edit.groups[0], 'journal_set_id': $number($edit.groups[1]), 'balances': [$map($rows, function($r) { ($class := $r.groups[0]; $rowId := $r.groups[1]; $cells := $match($r.groups[2], /<td[^>]*>([\\s\\S]*?)<\\/td>/); { 'row_id': $rowId, 'kind': $contains($class, 'standard_bank_account') ? 'bank_account' : 'journal_entry', 'account': $text($cells[1].groups[0]), 'information': $text($cells[2].groups[0]), 'debit': $htmlMoney($cells[3].groups[0]), 'credit': $htmlMoney($cells[4].groups[0]), 'bank_account_id': $contains($class, 'standard_bank_account') ? $number($substringAfter($rowId, 'standard_bank_account_')) : null, 'suspense': $contains($class, 'suspense') }) })] })"
+    },
+    {
+      "kind": "dom",
+      "fields": {
+        "edit_url": {
+          "selector": "a[href^='/accounting/journal_sets/'][href$='/edit']",
+          "attr": "href"
+        }
+      },
+      "post": "{ 'edit_url': edit_url, 'journal_set_id': $number($match(edit_url, /([0-9]+)\\/edit$/).groups[0]) }"
+    },
+    {
+      "kind": "dom",
+      "item": "table.Table tbody tr",
+      "fields": {
+        "row_id": { "selector": ":self", "attr": "id" },
+        "class": { "selector": ":self", "attr": "class" },
+        "account": { "selector": "td:nth-child(2)" },
+        "information": { "selector": "td:nth-child(3)" },
+        "debit": { "selector": "td:nth-child(4)" },
+        "credit": { "selector": "td:nth-child(5)" }
+      },
+      "post": "{ 'balances': $.{ 'row_id': row_id, 'kind': $contains(class, 'standard_bank_account') ? 'bank_account' : 'journal_entry', 'account': account, 'information': information, 'debit': $money(debit), 'credit': $money(credit), 'bank_account_id': $contains(class, 'standard_bank_account') ? $number($substringAfter(row_id, 'standard_bank_account_')) : null, 'suspense': $contains(class, 'suspense') } }"
+    }
+  ]
+}

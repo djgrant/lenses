@@ -1,0 +1,33 @@
+{
+  "name": "@djgrant/freeagent/paye-liabilities",
+  "description": "Reads FreeAgent PAYE and National Insurance liabilities.",
+  "url": "https://{account}.freeagent.com/tax/paye",
+  "returns": {"type": "object", "fields": {
+    "tax_year": "string",
+    "liabilities": {"type": "array", "items": {
+      "date": "string", "description": "string", "owed": {"type": "number", "nullable": true},
+      "paid": {"type": "number", "nullable": true}, "balance_owed": "number",
+      "url": {"type": "string", "nullable": true}
+    }}
+  }},
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' ? null : ($neg := $contains($v, '-'); $n := $number($replace($replace($replace($v, /-/, ''), /£/, ''), /,/, '')); $neg ? -$n : $n)) }"},
+  "effects": {"reads": ["FreeAgent account PAYE and National Insurance"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {"kind": "dom", "fields": {"heading": {"selector": "h1"}}, "post": "{'tax_year': $match(heading, /Tax Year ([0-9]{4}\\/[0-9]{2})/).groups[0]}"},
+    {
+      "kind": "dom",
+      "item": "table.Table tbody tr:has(td:nth-child(5))",
+      "fields": {
+        "date": {"selector": "td:nth-child(1)"}, "description": {"selector": "td:nth-child(2)"},
+        "href": {"selector": "td:nth-child(2) a", "attr": "href"},
+        "owed": {"selector": "td:nth-child(3)"}, "paid": {"selector": "td:nth-child(4)"},
+        "balance_owed": {"selector": "td:nth-child(5)"}
+      },
+      "post": "{'liabilities': $.{'date': date, 'description': description, 'owed': $money(owed), 'paid': $money(paid), 'balance_owed': $money(balance_owed), 'url': href ? href : null}}"
+    },
+    {"kind": "dom", "fields": {"table": {"selector": "table.Table"}}, "post": "{'liabilities': []}"
+    }
+  ]
+}

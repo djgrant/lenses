@@ -1,0 +1,54 @@
+{
+  "name": "@djgrant/freeagent/delete-journal-entry",
+  "description": "Deletes a posted FreeAgent journal by ID.",
+  "url": "https://{account}.freeagent.com/accounting/journal_sets/{id}/edit",
+  "params": { "id": "integer" },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "deleted": "boolean",
+      "id": "integer",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": { "hint": "Sign in to your FreeAgent account, then retry." }
+  },
+  "effects": {
+    "reads": ["FreeAgent account journal delete confirmation"],
+    "writes": ["FreeAgent account (permanently deletes a posted journal set)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "resolve": [
+    {
+      "kind": "http",
+      "credentials": true,
+      "sources": {
+        "csrf": {
+          "request": "GET https://{account}.freeagent.com/accounting/journal_sets/{id}/confirm_delete",
+          "items": "$match($, /name=\"authenticity_token\"[^>]*value=\"([^\"]+)\"/).groups[0]"
+        },
+        "deleted_page": {
+          "request": "POST https://{account}.freeagent.com/accounting/journal_sets/{id}",
+          "credentials": "same-origin-page",
+          "headers": {
+            "X-CSRF-Token": "$csrf",
+            "X-Requested-With": "'XMLHttpRequest'",
+            "Accept": "'text/html, application/xhtml+xml'"
+          },
+          "body": {
+            "search": {
+              "authenticity_token": "$csrf",
+              "_method": "'delete'"
+            }
+          }
+        }
+      },
+      "detect": {
+        "needs_auth": "$contains($csrf.url, '/login') or $contains($deleted_page.url, '/login') or $contains($string($deleted_page.body), '/sessions/new') or $csrf.status = 401 or $deleted_page.status = 401"
+      },
+      "map": "{ 'deleted': true, 'id': $id, 'confirmation': 'Journal deleted' }"
+    }
+  ]
+}

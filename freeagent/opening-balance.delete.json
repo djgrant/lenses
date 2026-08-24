@@ -1,0 +1,56 @@
+{
+  "name": "@djgrant/freeagent/delete-opening-balance",
+  "description": "Deletes a non-bank opening-balance line by entry ID.",
+  "url": "https://{account}.freeagent.com/accounting/journal_sets/{journal_set_id}/edit",
+  "params": {
+    "journal_set_id": {
+      "type": "integer",
+      "default": {
+        "$lens": "@djgrant/freeagent/opening-balances",
+        "field": "journal_set_id"
+      }
+    },
+    "entry_id": "integer"
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "deleted": "boolean",
+      "journal_set_id": "integer",
+      "entry_id": "integer",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": { "hint": "Sign in to your FreeAgent account, then retry." }
+  },
+  "detect": {
+    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"
+  },
+  "effects": {
+    "reads": ["FreeAgent account opening-balance editor"],
+    "writes": ["FreeAgent account (deletes one opening-balance journal line)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "perform": [
+    {
+      "wait": {
+        "appears": "#journal_set tr.journal_entry:has(input[name$='[id]'][value='{entry_id}']) input[name$='[_destroy]']"
+      }
+    },
+    {
+      "fill": "#journal_set tr.journal_entry:has(input[name$='[id]'][value='{entry_id}']) input[name$='[_destroy]']",
+      "value": "'true'"
+    },
+    { "submit": "#journal_set" },
+    { "wait": { "gone": "#journal_set", "timeoutMs": 30000 } }
+  ],
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": { "heading": { "selector": "h1" } },
+      "post": "{ 'deleted': true, 'journal_set_id': $journal_set_id, 'entry_id': $entry_id, 'confirmation': heading }"
+    }
+  ]
+}

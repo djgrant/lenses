@@ -1,0 +1,81 @@
+{
+  "name": "@djgrant/freeagent/journal-entries",
+  "description": "Lists posted FreeAgent journals across all accounting years.",
+  "url": "https://{account}.freeagent.com/accounting/journal_sets?ap=all",
+  "params": {
+    "limit": {
+      "type": "integer",
+      "default": 100
+    }
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "entries": {
+        "type": "array",
+        "items": {
+          "id": "integer",
+          "description": "string",
+          "url": "string"
+        }
+      }
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "Sign in to your FreeAgent account, then retry."
+    }
+  },
+  "detect": {
+    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"
+  },
+  "effects": {
+    "reads": [
+      "FreeAgent account posted journal entries"
+    ],
+    "writes": [],
+    "idempotent": true,
+    "cache": 0
+  },
+  "resolve": [
+    {
+      "kind": "http",
+      "request": "GET https://{account}.freeagent.com/accounting/journal_sets?ap=all",
+      "credentials": true,
+      "headers": {
+        "Cache-Control": "no-cache"
+      },
+      "detect": {
+        "needs_auth": "$contains(url, '/login') or $contains($string(body), 'Log in to your FreeAgent account')"
+      },
+      "map": "($d := $match($, /<span class=\"description[^\"]*\">&mdash;\\s*([^<]+)<\\/span>/); $u := $match($, /href=\"\\/accounting\\/journal_sets\\/([0-9]+)\\/edit\"/); $n := $min([$count($d), $count($u), $limit]); { 'entries': $n > 0 ? [$map([0..$n - 1], function($i) { { 'id': $number($u[$i].groups[0]), 'description': $trim($d[$i].groups[0]), 'url': ('https://' & $account & '.freeagent.com') & '/accounting/journal_sets/' & $u[$i].groups[0] } })] : [] })"
+    },
+    {
+      "kind": "dom",
+      "fields": {
+        "empty_message": {
+          "selector": ".fe-u-emptyMessage"
+        }
+      },
+      "post": "empty_message ? { 'entries': [] } : {}"
+    },
+    {
+      "kind": "dom",
+      "item": ".fe-CardV2:has(a[href^='/accounting/journal_sets/'][href$='/edit'])",
+      "fields": {
+        "description": {
+          "selector": ".description"
+        },
+        "edit_url": {
+          "selector": "a[href^='/accounting/journal_sets/'][href$='/edit']",
+          "attr": "href"
+        }
+      },
+      "post": "($rows := [$.{ 'id': $number($match(edit_url, /([0-9]+)\\/edit$/).groups[0]), 'description': $replace(description, /^—\\s*/, ''), 'url': $replace(edit_url, /\\/edit$/, '') }]; { 'entries': [$rows[[0..$limit - 1]]] })"
+    },
+    {
+      "kind": "llm",
+      "prompt": "Read the posted FreeAgent journal-entry list. Return an object with an entries array containing at most the requested limit in newest-to-oldest order. Each entry must have integer id (from its /accounting/journal_sets/<id> URL), description, and absolute url. Use {entries: []} when the page says there are no journals. Do not include the /new link, recurring profiles, or opening balances."
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "name": "@djgrant/freeagent/corporation-tax-returns",
+  "description": "Reads FreeAgent Corporation Tax returns and balances.",
+  "url": "https://{account}.freeagent.com/tax/corporation_tax_returns",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "returns": {
+        "type": "array",
+        "items": {
+          "accounting_year": "string",
+          "dated_on": "string",
+          "description": "string",
+          "payment_due": "string",
+          "liability": {"type": "number", "nullable": true},
+          "payment": {"type": "number", "nullable": true},
+          "balance_owed": "number",
+          "url": "string"
+        }
+      }
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' ? null : ($neg := $contains($v, '-'); $n := $number($replace($replace($replace($v, /-/, ''), /£/, ''), /,/, '')); $neg ? -$n : $n)) }"},
+  "effects": {"reads": ["FreeAgent account Corporation Tax returns"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "item": "table.Table tbody tr:has(a[href^='/tax/corporation_tax_returns/'])",
+      "fields": {
+        "dated_on": {"selector": "td:nth-child(1)"},
+        "description": {"selector": "td:nth-child(2)"},
+        "href": {"selector": "td:nth-child(2) a", "attr": "href"},
+        "payment_due": {"selector": "td:nth-child(3)"},
+        "liability": {"selector": "td:nth-child(4)"},
+        "payment": {"selector": "td:nth-child(5)"},
+        "balance_owed": {"selector": "td:nth-child(6)"}
+      },
+      "post": "{'returns': $.{'accounting_year': $match(description, /[0-9]{4}\\/[0-9]{2}/).match, 'dated_on': dated_on, 'description': description, 'payment_due': payment_due, 'liability': $money(liability), 'payment': $money(payment), 'balance_owed': $money(balance_owed), 'url': href}}"
+    }
+  ]
+}

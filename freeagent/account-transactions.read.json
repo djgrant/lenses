@@ -1,0 +1,39 @@
+{
+  "name": "@djgrant/freeagent/account-transactions",
+  "description": "Reads transactions for one FreeAgent nominal account and period.",
+  "url": "https://{account}.freeagent.com/accounting/show_transactions/{period}/{code}",
+  "params": {
+    "period": {"type": "string", "default": {"$lens": "@djgrant/freeagent/trial-balance", "field": "period"}},
+    "code": "string"
+  },
+  "returns": {"type": "object", "fields": {
+    "period": "string", "code": "string", "account": "string",
+    "transactions": {"type": "array", "items": {
+      "date": "string", "description": "string",
+      "debit": {"type": "number", "nullable": true}, "credit": {"type": "number", "nullable": true},
+      "url": {"type": "string", "nullable": true}
+    }}
+  }},
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' ? null : $number($replace($v, /,/, ''))) }"},
+  "effects": {"reads": ["FreeAgent account nominal-account transactions"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {"account_label": {"selector": "table.fe-DataTable-table tbody tr:first-child td[data-csv-cell-contents]", "attr": "data-csv-cell-contents"}},
+      "post": "{'period': $period, 'code': $code, 'account': $trim($substringAfter(account_label, ' '))}"
+    },
+    {
+      "kind": "dom",
+      "item": "table.fe-DataTable-table tbody tr:has(td:nth-child(5)):not([data-inline-column-header-indicator-row])",
+      "fields": {
+        "date": {"selector": "td:nth-child(2)"}, "description": {"selector": "td:nth-child(3)"},
+        "href": {"selector": "td:nth-child(3) a", "attr": "href"},
+        "debit": {"selector": "td:nth-child(4)"}, "credit": {"selector": "td:nth-child(5)"}
+      },
+      "post": "{'transactions': [$.{'date': date, 'description': description, 'debit': $money(debit), 'credit': $money(credit), 'url': href ? href : null}]}"
+    },
+    {"kind": "dom", "fields": {"table": {"selector": "table.fe-DataTable-table"}}, "post": "{'transactions': []}"}
+  ]
+}

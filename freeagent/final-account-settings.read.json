@@ -1,0 +1,35 @@
+{
+  "name": "@djgrant/freeagent/final-account-settings",
+  "description": "Reads both Current year and Previous year tabs from FreeAgent Final Accounts settings.",
+  "url": "https://{account}.freeagent.com/accounting/final_accounts/{end_date}/edit",
+  "params": {"end_date": {"type": "string", "default": {"$lens": "@djgrant/freeagent/accounting-periods", "field": "current_end_date"}}},
+  "returns": {"type": "object", "fields": {
+    "end_date": "string", "accounting_year": "string", "previous_accounting_year": "string",
+    "current_year": {"type": "object", "fields": {
+      "employee_average": "integer", "capital_commitments_note": "string", "contingent_liabilities_note": "string",
+      "director_advances_credits_note": "string", "director_guarantees_note": "string", "financial_commitments_note": "string"
+    }},
+    "previous_year": {"type": "array", "items": {"key": "string", "label": "string", "value": "number"}}
+  }},
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"number_or_zero": "function($s) { $trim($s) = '' ? 0 : $number($replace($s, /,/, '')) }"},
+  "effects": {"reads": ["FreeAgent account Final Accounts settings tabs"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {"kind": "dom", "fields": {
+      "title": {"selector": "title"},
+      "employee": {"selector": "#final_accounts_report_report_values_attributes_0_manual_current_value", "attr": "value"},
+      "capital": {"selector": "#final_accounts_report_report_notes_attributes_0_content"},
+      "contingent": {"selector": "#final_accounts_report_report_notes_attributes_1_content"},
+      "advances": {"selector": "#final_accounts_report_report_notes_attributes_2_content"},
+      "guarantees": {"selector": "#final_accounts_report_report_notes_attributes_3_content"},
+      "financial": {"selector": "#final_accounts_report_report_notes_attributes_4_content"},
+      "previous_legend": {"selector": "#income-statement-values legend"}
+    }, "post": "{'end_date': $end_date, 'accounting_year': $match(title, /Settings for ([0-9]{4}\\/[0-9]{4})/).groups[0], 'previous_accounting_year': $match(previous_legend, /([0-9]{4}\\/[0-9]{2})/).match, 'current_year': {'employee_average': $number(employee), 'capital_commitments_note': capital, 'contingent_liabilities_note': contingent, 'director_advances_credits_note': advances, 'director_guarantees_note': guarantees, 'financial_commitments_note': financial}}"},
+    {"kind": "dom", "item": "#previous-year input[type='hidden'][name$='[value_type]']", "fields": {
+      "key": {"selector": ":self", "attr": "value"},
+      "label": {"selector": "label", "scope": "+"},
+      "value": {"selector": "input[type='text']", "scope": "+", "attr": "value"}
+    }, "post": "{'previous_year': $.{'key': key, 'label': label, 'value': $number_or_zero(value)}}"}
+  ]
+}

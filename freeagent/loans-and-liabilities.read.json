@@ -1,0 +1,24 @@
+{
+  "name": "@djgrant/freeagent/loans-and-liabilities",
+  "description": "Reads and normalizes director loans and FreeAgent short/long-term liability nominal accounts.",
+  "url": "https://{account}.freeagent.com/accounting/trial_balance/{period}",
+  "params": {"period": {"type": "string", "default": {"$lens": "@djgrant/freeagent/trial-balance", "field": "period"}}},
+  "returns": {"type": "object", "fields": {
+    "period": "string", "as_at": "string",
+    "liabilities": {"type": "array", "items": {
+      "code": "string", "account": "string", "classification": "string", "term": "string",
+      "debit": {"type": "number", "nullable": true}, "credit": {"type": "number", "nullable": true},
+      "liability_balance": "number", "transactions_url": "string"
+    }}
+  }},
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { $trim($s) = '' ? null : $number($replace($s, /,/, '')) }"},
+  "effects": {"reads": ["FreeAgent account loans and liability balances"], "writes": [], "idempotent": true, "cache": 0},
+  "resolve": [
+    {"kind": "dom", "fields": {"title": {"selector": "title"}}, "post": "{'period': $period, 'as_at': $trim($substringAfter(title, 'Trial Balance as at'))}"},
+    {"kind": "dom", "item": "table.fe-DataTable-table tbody tr:has(a[href*='/accounting/show_transactions/'])", "fields": {"label": {"selector": "td:nth-child(1)"}, "href": {"selector": "td:nth-child(1) a", "attr": "href"}, "debit": {"selector": "td:nth-child(2)"}, "credit": {"selector": "td:nth-child(3)"}},
+      "post": "($rows := $.{'code': $match(href, /show_transactions\\/[^/]+\\/([^?]+)/).groups[0], 'account': $trim($substringAfter(label, ' ')), 'debit': $money(debit), 'credit': $money(credit), 'transactions_url': href}; {'liabilities': [$map($filter($rows, function($a) { $a.code in ['650','794','795','796','797','798','799','813'] or $contains($a.code, '907-') }), function($a) { {'code': $a.code, 'account': $a.account, 'classification': $contains($a.code, '907-') ? 'director_loan' : ($a.code = '650' ? 'provision' : ($a.code = '796' ? 'trade_creditor' : ($a.code = '797' ? 'other_creditor' : ($a.code = '813' ? 'pension_creditor' : ($a.code in ['798','799'] ? 'hire_purchase_liability' : 'other_liability'))))), 'term': $a.code in ['794','798'] ? 'short_term' : ($a.code in ['795','799'] ? 'long_term' : 'unspecified'), 'debit': $a.debit, 'credit': $a.credit, 'liability_balance': ($a.credit ? $a.credit : 0) - ($a.debit ? $a.debit : 0), 'transactions_url': $a.transactions_url} })]} )"
+    }
+  ]
+}
