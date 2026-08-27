@@ -1,0 +1,85 @@
+{
+  "name": "@djgrant/freeagent/contacts-and-outstanding",
+  "description": "Reads FreeAgent contacts and open or overdue invoices and bills, linking outstanding debtor and creditor amounts to their contacts for opening-balance audit work.",
+  "url": "https://{account}.freeagent.com/contacts",
+  "params": {
+    "limit": {"type": "integer", "default": 100}
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "contacts": {
+        "type": "array",
+        "items": {
+          "contact_id": "integer",
+          "name": "string",
+          "organisation": {"type": "string", "nullable": true},
+          "email": {"type": "string", "nullable": true},
+          "status": {"type": "string", "nullable": true},
+          "account_balance": {"type": "number", "nullable": true},
+          "url": "string"
+        }
+      },
+      "debtors": {
+        "type": "array",
+        "items": {
+          "invoice_id": "integer",
+          "contact_id": "integer",
+          "contact_name": "string",
+          "reference": "string",
+          "dated_on": "string",
+          "due_on": "string",
+          "status": "string",
+          "currency": "string",
+          "total": "number",
+          "paid": "number",
+          "outstanding": "number",
+          "url": "string"
+        }
+      },
+      "creditors": {
+        "type": "array",
+        "items": {
+          "bill_id": "integer",
+          "contact_id": "integer",
+          "contact_name": "string",
+          "reference": "string",
+          "dated_on": "string",
+          "due_on": "string",
+          "status": "string",
+          "currency": "string",
+          "total": "number",
+          "paid": "number",
+          "outstanding": "number",
+          "url": "string"
+        }
+      },
+      "total_debtors": "number",
+      "total_creditors": "number"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}
+  },
+  "effects": {
+    "reads": ["FreeAgent contacts and open or overdue invoices and bills"],
+    "writes": [],
+    "idempotent": true,
+    "cache": 0
+  },
+  "resolve": [
+    {
+      "kind": "http",
+      "credentials": true,
+      "sources": {
+        "contactData": {"request": "GET https://{account}.freeagent.com/v2/contacts?per_page={limit}"},
+        "invoiceData": {"request": "GET https://{account}.freeagent.com/v2/invoices?view=open_or_overdue&per_page={limit}"},
+        "billData": {"request": "GET https://{account}.freeagent.com/v2/bills?view=open_or_overdue&per_page={limit}"}
+      },
+      "detect": {
+        "needs_auth": "$contactData.status = 401 or $contactData.status = 403"
+      },
+      "map": "($id := function($url) { $number($match($url, /([0-9]+)$/).groups[0]) }; $num := function($v) { $exists($v) ? $number($v) : 0 }; $nullableNum := function($v) { $exists($v) ? $number($v) : null }; $contactName := function($c) { $exists($c) ? ($org := $trim($exists($c.organisation_name) ? $c.organisation_name : ''); $person := $trim(($exists($c.first_name) ? $c.first_name : '') & ' ' & ($exists($c.last_name) ? $c.last_name : '')); $org != '' ? $org : $person != '' ? $person : 'Unnamed contact') : 'Unknown contact' }; $contacts := [$contactData.contacts.{ 'contact_id': $id(url), 'name': $contactName($), 'organisation': $exists(organisation_name) and $trim(organisation_name) != '' ? organisation_name : null, 'email': $exists(email) and $trim(email) != '' ? email : null, 'status': $exists(status) ? status : null, 'account_balance': $nullableNum(account_balance), 'url': url }]; $debtors := [$invoiceData.invoices.($contactUrl := contact; $total := $num(total_value); $paid := $num(paid_value); $due := $exists(due_value) ? $number(due_value) : $total - $paid; $c := $contactData.contacts[url = $contactUrl][0]; { 'invoice_id': $id(url), 'contact_id': $id(contact), 'contact_name': $contactName($c), 'reference': $exists(reference) ? reference : '', 'dated_on': $exists(dated_on) ? dated_on : '', 'due_on': $exists(due_on) ? due_on : '', 'status': $exists(status) ? status : '', 'currency': $exists(currency) ? currency : 'GBP', 'total': $total, 'paid': $paid, 'outstanding': $due, 'url': url })[$.outstanding != 0]]; $creditors := [$billData.bills.($contactUrl := contact; $total := $num(total_value); $paid := $num(paid_value); $due := $exists(due_value) ? $number(due_value) : $total - $paid; $c := $contactData.contacts[url = $contactUrl][0]; { 'bill_id': $id(url), 'contact_id': $id(contact), 'contact_name': $contactName($c), 'reference': $exists(reference) ? reference : '', 'dated_on': $exists(dated_on) ? dated_on : '', 'due_on': $exists(due_on) ? due_on : '', 'status': $exists(status) ? status : '', 'currency': $exists(currency) ? currency : 'GBP', 'total': $total, 'paid': $paid, 'outstanding': $due, 'url': url })[$.outstanding != 0]]; {'contacts': $contacts, 'debtors': $debtors, 'creditors': $creditors, 'total_debtors': $sum($debtors.outstanding) ? $sum($debtors.outstanding) : 0, 'total_creditors': $sum($creditors.outstanding) ? $sum($creditors.outstanding) : 0})"
+    }
+  ]
+}

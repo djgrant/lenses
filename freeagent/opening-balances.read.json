@@ -31,7 +31,7 @@
     "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"
   },
   "helpers": {
-    "money": "function($s) { $trim($s) = '' ? null : $number($replace($s, /,/, '')) }"
+    "money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $m := $match($v, /-?[0-9][0-9,]*(?:\\.[0-9]+)?/).match; $exists($m) ? ($n := $number($replace($string($m), /,/, '')); $contains($v, '(') ? -$n : $n) : null) }"
   },
   "effects": {
     "reads": [
@@ -52,7 +52,7 @@
       "detect": {
         "needs_auth": "$contains(url, '/login') or $contains($string(body), 'Log in to your FreeAgent account')"
       },
-      "map": "($html := $string($); $edit := $match($html, /href=\"(\/accounting\/journal_sets\/([0-9]+)\/edit)\"/); $rows := $match($html, /<tr class=\"([^\"]*(?:standard_bank_account|journal_entry)[^\"]*)\" id=\"([^\"]+)\">([\\s\\S]*?)<\\/tr>/); $text := function($s) { $trim($replace($replace($replace($s, /<[^>]+>/, ''), /&gt;/, '>'), /&amp;/, '&')) }; $htmlMoney := function($s) { ($v := $text($s); $v = '' ? null : $number($replace($v, /,/, ''))) }; { 'edit_url': ('https://' & $account & '.freeagent.com') & $edit.groups[0], 'journal_set_id': $number($edit.groups[1]), 'balances': [$map($rows, function($r) { ($class := $r.groups[0]; $rowId := $r.groups[1]; $cells := $match($r.groups[2], /<td[^>]*>([\\s\\S]*?)<\\/td>/); { 'row_id': $rowId, 'kind': $contains($class, 'standard_bank_account') ? 'bank_account' : 'journal_entry', 'account': $text($cells[1].groups[0]), 'information': $text($cells[2].groups[0]), 'debit': $htmlMoney($cells[3].groups[0]), 'credit': $htmlMoney($cells[4].groups[0]), 'bank_account_id': $contains($class, 'standard_bank_account') ? $number($substringAfter($rowId, 'standard_bank_account_')) : null, 'suspense': $contains($class, 'suspense') }) })] })"
+      "map": "($html := $string($); $edit := $match($html, /href=\"(\/accounting\/journal_sets\/([0-9]+)\/edit)\"/); $rows := $match($html, /<tr class=\"([^\"]*(?:standard_bank_account|journal_entry)[^\"]*)\" id=\"([^\"]+)\">([\\s\\S]*?)<\\/tr>/); $text := function($s) { $trim($replace($replace($replace($s, /<[^>]+>/, ''), /&gt;/, '>'), /&amp;/, '&')) }; $htmlMoney := function($s) { ($v := $text($s); $m := $match($v, /-?[0-9][0-9,]*(?:\\.[0-9]+)?/).match; $exists($m) ? ($n := $number($replace($string($m), /,/, '')); $contains($v, '(') ? -$n : $n) : null) }; { 'edit_url': ('https://' & $account & '.freeagent.com') & $edit.groups[0], 'journal_set_id': $number($edit.groups[1]), 'balances': [$map($rows, function($r) { ($class := $r.groups[0]; $rowId := $r.groups[1]; $cells := $match($r.groups[2], /<td[^>]*>([\\s\\S]*?)<\\/td>/); $amountCells := $match($r.groups[2], /<td[^>]*class=\"[^\"]*num[^\"]*\"[^>]*>([\\s\\S]*?)<\\/td>/); { 'row_id': $rowId, 'kind': $contains($class, 'standard_bank_account') ? 'bank_account' : 'journal_entry', 'account': $text($cells[0].groups[0]), 'information': $text($cells[1].groups[0]), 'debit': $htmlMoney($amountCells[0].groups[0]), 'credit': $htmlMoney($amountCells[1].groups[0]), 'bank_account_id': $contains($class, 'standard_bank_account') ? $number($substringAfter($rowId, 'standard_bank_account_')) : null, 'suspense': $contains($class, 'suspense') }) })] })"
     },
     {
       "kind": "dom",
@@ -70,10 +70,10 @@
       "fields": {
         "row_id": { "selector": ":self", "attr": "id" },
         "class": { "selector": ":self", "attr": "class" },
-        "account": { "selector": "td:nth-child(2)" },
-        "information": { "selector": "td:nth-child(3)" },
-        "debit": { "selector": "td:nth-child(4)" },
-        "credit": { "selector": "td:nth-child(5)" }
+        "account": { "selector": "td:nth-child(1)" },
+        "information": { "selector": "td:nth-child(2)" },
+        "debit": { "selector": "td.num" },
+        "credit": { "selector": "td.num + td.num" }
       },
       "post": "{ 'balances': $.{ 'row_id': row_id, 'kind': $contains(class, 'standard_bank_account') ? 'bank_account' : 'journal_entry', 'account': account, 'information': information, 'debit': $money(debit), 'credit': $money(credit), 'bank_account_id': $contains(class, 'standard_bank_account') ? $number($substringAfter(row_id, 'standard_bank_account_')) : null, 'suspense': $contains(class, 'suspense') } }"
     }
