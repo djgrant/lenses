@@ -8,6 +8,7 @@
       "returns": {
         "type": "array",
         "items": {
+          "period": "string",
           "accounting_year": "string",
           "dated_on": "string",
           "description": "string",
@@ -37,7 +38,7 @@
         "payment": {"selector": "td:nth-child(5)"},
         "balance_owed": {"selector": "td:nth-child(6)"}
       },
-      "post": "{'returns': $.{'accounting_year': $match(description, /[0-9]{4}\\/[0-9]{2}/).match, 'dated_on': dated_on, 'description': description, 'payment_due': payment_due, 'liability': $money(liability), 'payment': $money(payment), 'balance_owed': $money(balance_owed), 'url': href}}"
+      "post": "{'returns': $.{'period': $match(href, /corporation_tax_returns\\/([^/?]+)/).groups[0], 'accounting_year': $match(description, /[0-9]{4}\\/[0-9]{2}/).match, 'dated_on': dated_on, 'description': description, 'payment_due': payment_due, 'liability': $money(liability), 'payment': $money(payment), 'balance_owed': $money(balance_owed), 'url': href}}"
     }
   ]
 }
