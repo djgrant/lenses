@@ -1,10 +1,16 @@
 {
-  "name": "@djgrant/freeagent/bank-reconciliation",
-  "description": "Reads FreeAgent's current bank reconciliation summary, account choices, unexplained totals, difference, and exports.",
-  "url": "https://{account}.freeagent.com/accounting/bank_reconciliation",
+  "name": "@djgrant/freeagent/bank-reconciliation-report",
+  "description": "Reads a FreeAgent Bank Reconciliation report for one explicit bank account and date-range token. Use bank-reconciliation to discover bank account IDs and the current period token.",
+  "url": "https://{account}.freeagent.com/accounting/bank_reconciliation/{period}/{bank_account_id}",
+  "params": {
+    "bank_account_id": "integer",
+    "period": "string"
+  },
   "returns": {"type": "object", "fields": {
     "period": "string", "bank_id": "string", "bank_account": "string", "date_range": "string",
-    "unexplained_money_in": "number", "unexplained_money_out": "number", "banking_closing_balance": "number", "statement_closing_balance": "number", "difference": "number", "is_reconciled": "boolean",
+    "unexplained_money_in": "number", "unexplained_money_out": "number",
+    "banking_closing_balance": "number", "statement_closing_balance": "number",
+    "difference": "number", "is_reconciled": "boolean",
     "summary_url": "string", "full_report_url": "string", "csv_url": "string", "pdf_url": "string",
     "bank_accounts": {"type": "array", "items": {"id": "string", "name": "string", "currency_symbol": "string"}},
     "rows": {"type": "array", "items": {"label": "string", "amount": "number", "url": {"type": "string", "nullable": true}}}
@@ -12,7 +18,7 @@
   "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
   "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
   "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' ? 0 : $number($replace($replace($v, /£/, ''), /,/, ''))) }"},
-  "effects": {"reads": ["FreeAgent account bank reconciliation"], "writes": [], "idempotent": true, "cache": 0},
+  "effects": {"reads": ["FreeAgent Bank Reconciliation report for a selected bank account and period"], "writes": [], "idempotent": true, "cache": 0},
   "resolve": [
     {"kind": "dom", "fields": {
       "summary": {"selector": ".fe-Tabs a[href^='/accounting/bank_reconciliation/']", "attr": "href"},

@@ -1,0 +1,49 @@
+{
+  "name": "@djgrant/freeagent/check-bank-reconciliation",
+  "description": "Submits a closing bank-statement balance to FreeAgent's Bank Reconciliation report for one bank account and period, then reads whether the report reconciles. This generates report criteria; it does not alter bank transactions or their explanations.",
+  "url": "https://{account}.freeagent.com/accounting/bank_reconciliation/{period}/{bank_account_id}",
+  "params": {
+    "bank_account_id": "integer",
+    "period": "string",
+    "statement_balance": "number"
+  },
+  "returns": {"type": "object", "fields": {
+    "applied": "boolean",
+    "period": "string", "bank_id": "string", "bank_account": "string", "date_range": "string",
+    "requested_statement_balance": "number",
+    "unexplained_money_in": "number", "unexplained_money_out": "number",
+    "banking_closing_balance": "number", "statement_closing_balance": "number",
+    "difference": "number", "is_reconciled": "boolean",
+    "summary_url": "string", "full_report_url": "string",
+    "rows": {"type": "array", "items": {"label": "string", "amount": "number", "url": {"type": "string", "nullable": true}}}
+  }},
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' ? 0 : $number($replace($replace($v, /£/, ''), /,/, ''))) }"},
+  "effects": {
+    "reads": ["FreeAgent Bank Reconciliation report for a selected bank account and period"],
+    "writes": ["FreeAgent Bank Reconciliation report criteria (submits the statement closing balance; does not change accounting entries)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "perform": [
+    {"wait": {"appears": "#closing_balance"}},
+    {"fill": "#closing_balance", "value": "$string($statement_balance)"},
+    {"click": "form[action='/accounting/bank_reconciliation/generate'] button[type='submit']"},
+    {"wait": {"appears": "#closing_balance[value^='{statement_balance}']", "timeoutMs": 30000}}
+  ],
+  "resolve": [
+    {"kind": "dom", "fields": {
+      "summary": {"selector": ".fe-Tabs a[href^='/accounting/bank_reconciliation/']", "attr": "href"},
+      "full": {"selector": ".fe-Tabs a[href^='/accounting/bank_reconciliation_full_report/']", "attr": "href"},
+      "account": {"selector": "#bank_account option:checked"},
+      "range": {"selector": ".fe-Report-documentHeader p"},
+      "unexplained_in": {"selector": ".fe-Report-documentBody tbody tr:nth-child(7) td:nth-child(2)"},
+      "unexplained_out": {"selector": ".fe-Report-documentBody tbody tr:nth-child(8) td:nth-child(2)"},
+      "banking_closing": {"selector": ".fe-Report-documentBody tbody tr:nth-child(9) td:last-child"},
+      "statement_closing": {"selector": ".fe-Report-documentBody tbody tr:nth-child(10) td:last-child"},
+      "difference": {"selector": "#balance_difference"}
+    }, "post": "($m := $match(summary, /bank_reconciliation\\/([^/]+)\\/([^/?]+)/); $d := $money(difference); {'applied': true, 'period': $m.groups[0], 'bank_id': $m.groups[1], 'bank_account': account, 'date_range': range, 'requested_statement_balance': $statement_balance, 'unexplained_money_in': $money(unexplained_in), 'unexplained_money_out': $money(unexplained_out), 'banking_closing_balance': $money(banking_closing), 'statement_closing_balance': $money(statement_closing), 'difference': $d, 'is_reconciled': $d = 0, 'summary_url': summary, 'full_report_url': full})"},
+    {"kind": "dom", "item": ".fe-Report-documentBody tbody tr", "fields": {"label": {"selector": "td:nth-child(1)"}, "href": {"selector": "td:nth-child(1) a", "attr": "href"}, "amount_1": {"selector": "td:nth-child(2)"}, "amount_2": {"selector": "td:nth-child(3)"}}, "post": "{'rows': $.{'label': label, 'amount': $trim(amount_2) != '' ? $money(amount_2) : $money(amount_1), 'url': href ? href : null}}"}
+  ]
+}

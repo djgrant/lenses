@@ -1,0 +1,57 @@
+{
+  "name": "@djgrant/freeagent/business-setup",
+  "description": "Reads the FreeAgent business identity, accounting dates and basis, and UK VAT registration and initial return settings needed to audit account setup.",
+  "url": "https://{account}.freeagent.com/settings/details",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "business_type": "string",
+      "company_number": {"type": "string", "nullable": true},
+      "business_start_date": "string",
+      "trading_start_date": {"type": "string", "nullable": true},
+      "accounting_year_end": "string",
+      "freeagent_start_date": "string",
+      "accounting_basis": {"type": "string", "nullable": true},
+      "vat": {
+        "type": "object",
+        "fields": {
+          "status": "string",
+          "registered": "boolean",
+          "registration_number": {"type": "string", "nullable": true},
+          "registration_effective_date": {"type": "string", "nullable": true},
+          "deregistration_effective_date": {"type": "string", "nullable": true},
+          "first_return_period_end": {"type": "string", "nullable": true},
+          "return_frequency": {"type": "string", "nullable": true},
+          "accounting_basis": {"type": "string", "nullable": true},
+          "flat_rate_scheme": {"type": "boolean", "nullable": true},
+          "non_standard_rates_enabled": {"type": "boolean", "nullable": true},
+          "pre_registration_period_months": {"type": "integer", "nullable": true}
+        }
+      }
+    }
+  },
+  "outcomes": {
+    "needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}
+  },
+  "effects": {
+    "reads": ["FreeAgent business details, accounting dates and VAT registration settings"],
+    "writes": [],
+    "idempotent": true,
+    "cache": 0
+  },
+  "resolve": [
+    {
+      "kind": "http",
+      "credentials": true,
+      "sources": {
+        "details": {"request": "GET https://{account}.freeagent.com/settings/details"},
+        "dates": {"request": "GET https://{account}.freeagent.com/settings/accounting_dates"},
+        "vatPage": {"request": "GET https://{account}.freeagent.com/settings/uk_vat_registration"}
+      },
+      "detect": {
+        "needs_auth": "$contains($string($details), 'Log in to your FreeAgent account') or $contains($string($dates), 'Log in to your FreeAgent account') or $contains($string($vatPage), 'Log in to your FreeAgent account')"
+      },
+      "map": "($d := $string($details); $a := $string($dates); $v := $string($vatPage); $val := function($tag) { $exists($tag) ? ($x := $match($string($tag), /value=\"([^\"]*)\"/).groups[0]; ($not($exists($x)) or $x = '') ? null : $x) : null }; $selected := function($block) { $exists($block) ? ($tag := $match($string($block), /<option[^>]*selected=\"selected\"[^>]*>/).match; $val($tag)) : null }; $companyTypeBlock := $match($d, /<select[^>]*id=\"company_type\"[^>]*>[\\s\\S]*?<\\/select>/).match; $companyType := $val($match($string($companyTypeBlock), /<option[^>]*>/).match); $companyNumber := $val($match($d, /<input[^>]*id=\"company_registration_number\"[^>]*>/).match); $businessStart := $val($match($a, /<input[^>]*id=\"company_company_start_date\"[^>]*>/).match); $tradingStart := $val($match($a, /<input[^>]*id=\"company_trading_start_date\"[^>]*>/).match); $yearEnd := $val($match($a, /<input[^>]*id=\"company_first_accounting_year_end_date\"[^>]*>/).match); $faStart := $val($match($a, /<input[^>]*id=\"company_freeagent_start_date\"[^>]*>/).match); $accountingBasisBlock := $match($d & $a, /<select[^>]*id=\"[^\"]*(?:accounting_basis|cash_basis)[^\"]*\"[^>]*>[\\s\\S]*?<\\/select>/).match; $accountingBasisRadio := $match($d & $a, /<input(?=[^>]*(?:id|name)=\"[^\"]*(?:accounting_basis|cash_basis)[^\"]*\")(?=[^>]*checked=\"checked\")[^>]*>/).match; $accountingBasis := $exists($accountingBasisBlock) ? $selected($accountingBasisBlock) : $val($accountingBasisRadio); $vatStatusTag := $match($v, /<input(?=[^>]*vat_registration_status)(?=[^>]*checked=\"checked\")[^>]*>/).match; $vatStatus := $val($vatStatusTag); $vatNumber := $val($match($v, /<input[^>]*id=\"company_latest_vat_registration_attributes_vat_registration_number\"[^>]*>/).match); $vatEffective := $val($match($v, /<input[^>]*id=\"company_latest_vat_registration_attributes_registration_effective_date\"[^>]*>/).match); $vatDeregistered := $val($match($v, /<input[^>]*id=\"company_latest_vat_registration_attributes_deregistration_effective_date\"[^>]*>/).match); $vatFirstEnd := $val($match($v, /<input[^>]*id=\"company_latest_vat_registration_attributes_first_return_period_ends_on\"[^>]*>/).match); $frequency := $selected($match($v, /<select[^>]*id=\"company_latest_vat_registration_attributes_default_period_length\"[^>]*>[\\s\\S]*?<\\/select>/).match); $vatBasis := $selected($match($v, /<select[^>]*id=\"company_latest_vat_registration_attributes_initial_basis\"[^>]*>[\\s\\S]*?<\\/select>/).match); $frs := $val($match($v, /<input(?=[^>]*initially_on_frs)(?=[^>]*checked=\"checked\")[^>]*>/).match); $nonStandard := $val($match($v, /<input(?=[^>]*ec_vat_reporting_enabled)(?=[^>]*checked=\"checked\")[^>]*>/).match); $preReg := $selected($match($v, /<select[^>]*id=\"company_latest_vat_registration_attributes_default_pre_registration_period_in_months\"[^>]*>[\\s\\S]*?<\\/select>/).match); {'business_type': $companyType, 'company_number': $companyNumber, 'business_start_date': $businessStart, 'trading_start_date': $tradingStart, 'accounting_year_end': $yearEnd, 'freeagent_start_date': $faStart, 'accounting_basis': $accountingBasis, 'vat': {'status': $vatStatus, 'registered': $vatStatus = 'Registered', 'registration_number': $vatNumber, 'registration_effective_date': $vatEffective, 'deregistration_effective_date': $vatDeregistered, 'first_return_period_end': $vatFirstEnd, 'return_frequency': $frequency, 'accounting_basis': $vatBasis, 'flat_rate_scheme': $frs = 'true' ? true : $frs = 'false' ? false : null, 'non_standard_rates_enabled': $nonStandard = 'true' ? true : $nonStandard = 'false' ? false : null, 'pre_registration_period_months': $preReg ? $number($preReg) : null}})"
+    }
+  ]
+}
