@@ -1,0 +1,90 @@
+{
+  "name": "@djgrant/freeagent/create-manual-bank-transaction",
+  "description": "Creates and explains a manual transaction in a FreeAgent bank account using FreeAgent's bank-account-entry endpoint.",
+  "url": "https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/new",
+  "params": {
+    "bank_account_id": "integer",
+    "main_type": "string",
+    "date": "string",
+    "amount": "number",
+    "nominal_code": "string",
+    "sales_tax_rate": {
+      "type": "number",
+      "default": -5.0
+    },
+    "description": "string"
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "created": "boolean",
+      "bank_account_id": "integer",
+      "main_type": "string",
+      "date": "string",
+      "amount": "number",
+      "nominal_code": "string",
+      "sales_tax_rate": "number",
+      "description": "string",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "Sign in to your FreeAgent account, then retry."
+    },
+    "rejected": {
+      "hint": "FreeAgent rejected the transaction. Check the main type, nominal code, VAT rate, date, and amount."
+    }
+  },
+  "detect": {
+    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"
+  },
+  "effects": {
+    "reads": [
+      "FreeAgent manual bank-account entry form"
+    ],
+    "writes": [
+      "FreeAgent account (creates and explains a manual bank transaction)"
+    ],
+    "idempotent": false,
+    "cache": 0
+  },
+  "resolve": [
+    {
+      "kind": "http",
+      "credentials": true,
+      "sources": {
+        "csrf": {
+          "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/new",
+          "items": "$match($, /name=\"csrf-token\" content=\"([^\"]+)\"/).groups[0]"
+        },
+        "created_page": {
+          "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries",
+          "credentials": "same-origin-page",
+          "headers": {
+            "X-CSRF-Token": "$csrf",
+            "X-Requested-With": "'XMLHttpRequest'",
+            "Accept": "'text/html, application/xhtml+xml'"
+          },
+          "body": {
+            "search": {
+              "authenticity_token": "$csrf",
+              "bank_account_entry[main_type]": "$main_type",
+              "bank_account_entry[dated_on]": "$date",
+              "bank_account_entry[gross_value]": "$string($amount)",
+              "bank_account_entry[nominal_code]": "$nominal_code",
+              "bank_account_entry[sales_tax_rate]": "$string($sales_tax_rate)",
+              "bank_account_entry[description]": "$description",
+              "commit": "'Create and Finish'"
+            }
+          }
+        }
+      },
+      "detect": {
+        "needs_auth": "$contains($csrf.url, '/login') or $contains($created_page.url, '/login') or $csrf.status = 401 or $created_page.status = 401",
+        "rejected": "$created_page.status >= 400"
+      },
+      "map": "{ 'created': true, 'bank_account_id': $bank_account_id, 'main_type': $main_type, 'date': $date, 'amount': $amount, 'nominal_code': $nominal_code, 'sales_tax_rate': $sales_tax_rate, 'description': $description, 'confirmation': 'Manual bank transaction created' }"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "name": "@djgrant/freeagent/manual-bank-transaction-options",
+  "description": "Reads the transaction types and accounting categories offered by FreeAgent's manual bank-entry form.",
+  "url": "https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/new",
+  "params": {
+    "bank_account_id": "integer"
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "bank_account_id": "integer",
+      "bank_account": "string",
+      "transaction_types": {
+        "type": "array",
+        "items": {
+          "value": "string",
+          "label": "string"
+        }
+      },
+      "categories": {
+        "type": "array",
+        "items": {
+          "value": "string",
+          "label": "string"
+        }
+      }
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "Sign in to your FreeAgent account, then retry."
+    }
+  },
+  "detect": {
+    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"
+  },
+  "effects": {
+    "reads": [
+      "FreeAgent manual bank-account entry form options"
+    ],
+    "writes": [],
+    "idempotent": true,
+    "cache": 0
+  },
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "account": {
+          "selector": "h2"
+        }
+      },
+      "post": "{ 'bank_account_id': $bank_account_id, 'bank_account': account }"
+    },
+    {
+      "kind": "dom",
+      "item": "select[name$='[type]'] option[value]:not([value=''])",
+      "fields": {
+        "label": { "selector": ":self" },
+        "value": {
+          "selector": ":self",
+          "attr": "value"
+        }
+      },
+      "post": "{ 'transaction_types': $.{ 'value': value, 'label': label } }"
+    },
+    {
+      "kind": "dom",
+      "item": "select[name*='category'] option[value]:not([value=''])",
+      "fields": {
+        "label": { "selector": ":self" },
+        "value": {
+          "selector": ":self",
+          "attr": "value"
+        }
+      },
+      "post": "{ 'categories': $.{ 'value': value, 'label': label } }"
+    }
+  ]
+}
