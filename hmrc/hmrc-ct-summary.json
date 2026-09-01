@@ -1,0 +1,50 @@
+{
+  "name": "@notation/hmrc/ct-summary",
+  "url": "https://www.tax.service.gov.uk/business-account",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "utr": "string",
+      "amountOwed": "number",
+      "returnsStatus": "string",
+      "statementUrl": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
+    }
+  },
+  "effects": {
+    "reads": [
+      "tax.service.gov.uk"
+    ],
+    "writes": [],
+    "idempotent": true,
+    "cache": 300
+  },
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "utr": {
+          "selector": "#ct-heading .card-ref"
+        },
+        "amountOwedText": {
+          "selector": "#ct-your-balance + p span"
+        },
+        "returnsStatus": {
+          "selector": "#ct-your-returns + p"
+        },
+        "statementUrl": {
+          "selector": "#view-ct-statement",
+          "attr": "href"
+        }
+      },
+      "post": "({ 'utr': $digits(utr), 'amountOwed': $money(amountOwedText), 'returnsStatus': $text(returnsStatus), 'statementUrl': $text(statementUrl) })",
+      "detect": {
+        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      }
+    }
+  ]
+}

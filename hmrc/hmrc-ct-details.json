@@ -1,0 +1,54 @@
+{
+  "name": "@notation/hmrc/ct-details",
+  "url": "https://www.tax.service.gov.uk/business-account/corporation-tax",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "utr": "string",
+      "amountOwed": "number",
+      "returnsGuidance": "string",
+      "statementUrl": "string",
+      "makePaymentUrl": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
+    }
+  },
+  "effects": {
+    "reads": [
+      "tax.service.gov.uk"
+    ],
+    "writes": [],
+    "idempotent": true
+  },
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "utr": {
+          "selector": "#ct-utr p.govuk-body-s"
+        },
+        "amountOwedText": {
+          "selector": "p [class*=\"font-weight-bold\"]"
+        },
+        "returnsGuidance": {
+          "selector": "#ct-file-return"
+        },
+        "statementUrl": {
+          "selector": "#ct-see-breakdown",
+          "attr": "href"
+        },
+        "makePaymentUrl": {
+          "selector": "#ct-make-payment-link",
+          "attr": "href"
+        }
+      },
+      "post": "({ 'utr': $digits(utr), 'amountOwed': $money(amountOwedText), 'returnsGuidance': $text(returnsGuidance), 'statementUrl': $text(statementUrl), 'makePaymentUrl': $text(makePaymentUrl) })",
+      "detect": {
+        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      }
+    }
+  ]
+}

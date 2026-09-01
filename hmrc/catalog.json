@@ -1,0 +1,12 @@
+{
+  "helpers": {
+    "text": "function($t){ $type($t) = 'string' ? $t : null }",
+    "has": "function($t){ $type($t) = 'string' }",
+    "digits": "function($t){ $type($t) = 'string' ? $replace($t, /[^0-9]/, '') : null }",
+    "int": "function($t){ ($m := $type($t) = 'string' ? $match($t, /[0-9]+/)[0].match; $exists($m) ? $number($m) : null) }",
+    "money": "function($t){ ($s := $type($t) = 'string' ? $replace($t, /[^0-9.]/, '') : ''; $s = '' ? null : (($contains($t, '−') or $contains($t, '-')) ? -$number($s) : $number($s))) }",
+    "strip": "function($t, $p){ $type($t) = 'string' ? $trim($replace($t, $p, '')) : null }",
+    "after": "function($t, $p){ $type($t) = 'string' ? $trim($substringAfter($t, $p)) : null }",
+    "before": "function($t, $p){ $type($t) = 'string' ? $trim($substringBefore($t, $p)) : null }"
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "name": "@notation/hmrc/vat-penalties",
+  "url": "https://www.tax.service.gov.uk/penalties?identifier={vrn}&pointSource=VAT",
+  "params": {
+    "vrn": {
+      "type": "string",
+      "default": {
+        "$lens": "@notation/hmrc/vat-summary",
+        "field": "vrn"
+      }
+    }
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "overview": "string",
+      "lateSubmissionPoints": {
+        "type": "integer",
+        "nullable": true
+      },
+      "lateSubmissionSummary": "string",
+      "latePaymentSummary": "string",
+      "points": {
+        "type": "array",
+        "items": {
+          "point": "string",
+          "status": "string",
+          "vatPeriod": {
+            "type": "string",
+            "nullable": true
+          },
+          "returnDue": {
+            "type": "string",
+            "nullable": true
+          },
+          "returnSubmitted": {
+            "type": "string",
+            "nullable": true
+          },
+          "expires": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
+    }
+  },
+  "effects": {
+    "reads": [
+      "tax.service.gov.uk"
+    ],
+    "writes": [],
+    "idempotent": true
+  },
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "overview": {
+          "selector": "#what-is-owed ul.govuk-list"
+        },
+        "pointsText": {
+          "selector": "#late-submission-penalties p.govuk-body"
+        },
+        "lateSubmissionSummary": {
+          "selector": "#late-submission-penalties p.govuk-body + p.govuk-body"
+        },
+        "latePaymentSummary": {
+          "selector": "#late-payment-penalties p.govuk-body"
+        }
+      },
+      "post": "({ 'overview': $text(overview), 'lateSubmissionPoints': $int(pointsText), 'lateSubmissionSummary': $text(lateSubmissionSummary), 'latePaymentSummary': $text(latePaymentSummary) })",
+      "detect": {
+        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      }
+    },
+    {
+      "kind": "dom",
+      "item": "#late-submission-penalties section.app-summary-card",
+      "fields": {
+        "point": {
+          "selector": ".app-summary-card__title"
+        },
+        "status": {
+          "selector": ".app-summary-card__tag .govuk-tag"
+        },
+        "vatPeriod": {
+          "selector": ".govuk-summary-list__row:nth-child(1) dd"
+        },
+        "returnDue": {
+          "selector": ".govuk-summary-list__row:nth-child(2) dd"
+        },
+        "returnSubmitted": {
+          "selector": ".govuk-summary-list__row:nth-child(3) dd"
+        },
+        "expires": {
+          "selector": ".govuk-summary-list__row:nth-child(4) dd"
+        }
+      },
+      "post": "({ 'points': [$.{ 'point': $text(point), 'status': $text(status), 'vatPeriod': $text(vatPeriod), 'returnDue': $text(returnDue), 'returnSubmitted': $text(returnSubmitted), 'expires': $text(expires) }] })",
+      "detect": {
+        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      }
+    }
+  ]
+}

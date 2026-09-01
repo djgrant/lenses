@@ -1,0 +1,103 @@
+{
+  "name": "@notation/hmrc/vat-summary",
+  "url": "https://www.tax.service.gov.uk/business-account",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "vrn": "string",
+      "returnsStatus": "string",
+      "returnsToSubmit": {
+        "type": "integer",
+        "nullable": true
+      },
+      "hasPenalty": "boolean",
+      "penaltyUrl": {
+        "type": "string",
+        "nullable": true
+      },
+      "penalties": {
+        "$lens": "@notation/hmrc/vat-penalties",
+        "params": {
+          "vrn": "vrn"
+        }
+      },
+      "deadlinesUrl": "string",
+      "deadlines": {
+        "$lens": "@notation/hmrc/vat-return-deadlines"
+      },
+      "submittedReturnsUrl": "string",
+      "submittedReturns": {
+        "$lens": "@notation/hmrc/vat-submitted-returns"
+      },
+      "whatYouOweUrl": "string",
+      "whatYouOwe": {
+        "$lens": "@notation/hmrc/vat-what-you-owe"
+      },
+      "paymentHistoryUrl": "string",
+      "paymentHistory": {
+        "$lens": "@notation/hmrc/vat-payment-history"
+      },
+      "overviewUrl": "string",
+      "overview": {
+        "$lens": "@notation/hmrc/vat-overview"
+      }
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
+    }
+  },
+  "effects": {
+    "reads": [
+      "tax.service.gov.uk"
+    ],
+    "writes": [],
+    "idempotent": true,
+    "cache": 300
+  },
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "vrn": {
+          "selector": "#mtd-heading .card-ref"
+        },
+        "returnsStatus": {
+          "selector": "#multiple-returns-count"
+        },
+        "penaltyText": {
+          "selector": "#mtd-vat-penalty .govuk-warning-text__text"
+        },
+        "penaltyUrl": {
+          "selector": "#mtd-vat-penalty a",
+          "attr": "href"
+        },
+        "deadlinesUrl": {
+          "selector": "#multiple-returns-view-deadlines",
+          "attr": "href"
+        },
+        "submittedReturnsUrl": {
+          "selector": "#multiple-returns-submitted-returns",
+          "attr": "href"
+        },
+        "whatYouOweUrl": {
+          "selector": "#payments-what-you-owe",
+          "attr": "href"
+        },
+        "paymentHistoryUrl": {
+          "selector": "#payments-view-payments",
+          "attr": "href"
+        },
+        "overviewUrl": {
+          "selector": "#mtd-card-manage-account",
+          "attr": "href"
+        }
+      },
+      "post": "({ 'vrn': $digits(vrn), 'returnsStatus': $text(returnsStatus), 'returnsToSubmit': $int(returnsStatus), 'hasPenalty': $has(penaltyText), 'penaltyUrl': $text(penaltyUrl), 'deadlinesUrl': $text(deadlinesUrl), 'submittedReturnsUrl': $text(submittedReturnsUrl), 'whatYouOweUrl': $text(whatYouOweUrl), 'paymentHistoryUrl': $text(paymentHistoryUrl), 'overviewUrl': $text(overviewUrl), 'penalties': $has(penaltyText) ? {} : null })",
+      "detect": {
+        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      }
+    }
+  ]
+}

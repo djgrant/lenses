@@ -1,0 +1,133 @@
+{
+  "name": "@notation/hmrc/vat-return",
+  "url": "https://www.tax.service.gov.uk/vat-through-software/vat-returns/submitted/{year}/{periodKey}",
+  "params": {
+    "year": {
+      "type": "string"
+    },
+    "periodKey": {
+      "type": "string"
+    }
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "businessName": "string",
+      "period": "string",
+      "returnTotal": {
+        "type": "number",
+        "nullable": true
+      },
+      "owedToHmrc": {
+        "type": "number",
+        "nullable": true
+      },
+      "dueDate": "string",
+      "dateSubmitted": "string",
+      "box1VatDueOnSales": {
+        "type": "number",
+        "nullable": true
+      },
+      "box2VatDueOnAcquisitions": {
+        "type": "number",
+        "nullable": true
+      },
+      "box3TotalVatDue": {
+        "type": "number",
+        "nullable": true
+      },
+      "box4VatReclaimed": {
+        "type": "number",
+        "nullable": true
+      },
+      "box5NetVat": {
+        "type": "number",
+        "nullable": true
+      },
+      "box6TotalSales": {
+        "type": "number",
+        "nullable": true
+      },
+      "box7TotalPurchases": {
+        "type": "number",
+        "nullable": true
+      },
+      "box8TotalDispatches": {
+        "type": "number",
+        "nullable": true
+      },
+      "box9TotalAcquisitions": {
+        "type": "number",
+        "nullable": true
+      }
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
+    }
+  },
+  "effects": {
+    "reads": [
+      "tax.service.gov.uk"
+    ],
+    "writes": [],
+    "idempotent": true
+  },
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "heading": {
+          "selector": "#content h1"
+        },
+        "businessName": {
+          "selector": "#content h1 .govuk-caption-xl"
+        },
+        "returnTotal": {
+          "selector": ".return-total"
+        },
+        "owedToHmrc": {
+          "selector": ".owe-hmrc"
+        },
+        "dueDate": {
+          "selector": "#content section > ul.govuk-list > li:nth-child(1)"
+        },
+        "dateSubmitted": {
+          "selector": "#content section > ul.govuk-list > li:nth-child(2)"
+        },
+        "box1": {
+          "selector": "#box-one .govuk-summary-list__actions"
+        },
+        "box2": {
+          "selector": "#box-two .govuk-summary-list__actions"
+        },
+        "box3": {
+          "selector": "#box-three .govuk-summary-list__actions"
+        },
+        "box4": {
+          "selector": "#box-four .govuk-summary-list__actions"
+        },
+        "box5": {
+          "selector": "#box-five .govuk-summary-list__actions"
+        },
+        "box6": {
+          "selector": "#box-six .govuk-summary-list__actions"
+        },
+        "box7": {
+          "selector": "#box-seven .govuk-summary-list__actions"
+        },
+        "box8": {
+          "selector": "#box-eight .govuk-summary-list__actions"
+        },
+        "box9": {
+          "selector": "#box-nine .govuk-summary-list__actions"
+        }
+      },
+      "post": "({ 'businessName': $strip(businessName, 'Submitted return for '), 'period': ($has(heading) and $has(businessName)) ? $trim($substringAfter(heading, businessName)) : null, 'returnTotal': $money($strip(returnTotal, 'Return total:')), 'owedToHmrc': $money($strip(owedToHmrc, 'You owe HMRC:')), 'dueDate': $strip(dueDate, 'Return due date:'), 'dateSubmitted': $strip(dateSubmitted, 'Date submitted:'), 'box1VatDueOnSales': $money(box1), 'box2VatDueOnAcquisitions': $money(box2), 'box3TotalVatDue': $money(box3), 'box4VatReclaimed': $money(box4), 'box5NetVat': $money(box5), 'box6TotalSales': $money(box6), 'box7TotalPurchases': $money(box7), 'box8TotalDispatches': $money(box8), 'box9TotalAcquisitions': $money(box9) })",
+      "detect": {
+        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      }
+    }
+  ]
+}

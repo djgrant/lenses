@@ -1,0 +1,84 @@
+{
+  "name": "@notation/hmrc/ct-period",
+  "url": "https://www.tax.service.gov.uk/corporation-tax/org/{utr}/account/period/{period}",
+  "params": {
+    "utr": {
+      "type": "string",
+      "default": {
+        "$lens": "@notation/hmrc/ct-summary",
+        "field": "utr"
+      }
+    },
+    "period": {
+      "type": "string"
+    }
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "periodEnding": "string",
+      "paymentReference": "string",
+      "tax": "number",
+      "interest": "number",
+      "penalties": "number",
+      "subTotal": "number",
+      "lessPaid": "number",
+      "repaymentsReallocations": "number",
+      "adjustments": "number",
+      "total": "number"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
+    }
+  },
+  "effects": {
+    "reads": [
+      "tax.service.gov.uk"
+    ],
+    "writes": [],
+    "idempotent": true
+  },
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "periodEnding": {
+          "selector": "#PortletAccountingPeriodOverview h3"
+        },
+        "paymentReferenceText": {
+          "selector": "#PortletAccountingPeriodOverview"
+        },
+        "tax": {
+          "selector": "table.default tbody tr:nth-child(1) td.numeric"
+        },
+        "interest": {
+          "selector": "table.default tbody tr:nth-child(2) td.numeric"
+        },
+        "penalties": {
+          "selector": "table.default tbody tr:nth-child(3) td.numeric"
+        },
+        "subTotal": {
+          "selector": "table.default tbody tr:nth-child(4) td.numeric"
+        },
+        "lessPaid": {
+          "selector": "table.default tbody tr:nth-child(5) td.numeric"
+        },
+        "repaymentsReallocations": {
+          "selector": "table.default tbody tr:nth-child(6) td.numeric"
+        },
+        "adjustments": {
+          "selector": "table.default tbody tr:nth-child(7) td.numeric"
+        },
+        "total": {
+          "selector": "table.default tbody tr:nth-child(8) td.numeric"
+        }
+      },
+      "post": "($ref := $type(paymentReferenceText) = 'string' ? $match(paymentReferenceText, /[0-9]{10}A[0-9]{5}[A-Z]/)[0].match; { 'periodEnding': $strip(periodEnding, 'Accounting period ending'), 'paymentReference': $exists($ref) ? $ref : $text(paymentReferenceText), 'tax': $money(tax), 'interest': $money(interest), 'penalties': $money(penalties), 'subTotal': $money(subTotal), 'lessPaid': $money(lessPaid), 'repaymentsReallocations': $money(repaymentsReallocations), 'adjustments': $money(adjustments), 'total': $money(total) })",
+      "detect": {
+        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      }
+    }
+  ]
+}

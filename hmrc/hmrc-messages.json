@@ -1,0 +1,50 @@
+{
+  "name": "@notation/hmrc/messages",
+  "url": "https://www.tax.service.gov.uk/business-account/messages",
+  "returns": {
+    "type": "array",
+    "items": {
+      "inbox": "string",
+      "status": "string",
+      "unread": {
+        "type": "integer",
+        "nullable": true
+      },
+      "url": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
+    }
+  },
+  "effects": {
+    "reads": [
+      "tax.service.gov.uk"
+    ],
+    "writes": [],
+    "idempotent": true
+  },
+  "resolve": [
+    {
+      "kind": "dom",
+      "item": "#message-section dl.govuk-summary-list > div.govuk-summary-list__row",
+      "fields": {
+        "inbox": {
+          "selector": "dt a"
+        },
+        "url": {
+          "selector": "dt a",
+          "attr": "href"
+        },
+        "status": {
+          "selector": "dd span.unread-messages-count"
+        }
+      },
+      "post": "([$.( $u := $int(status); { 'inbox': $text(inbox), 'status': $text(status), 'unread': $u != null ? $u : 0, 'url': $text(url) } )])",
+      "detect": {
+        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      }
+    }
+  ]
+}

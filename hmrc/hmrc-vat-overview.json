@@ -1,0 +1,59 @@
+{
+  "name": "@notation/hmrc/vat-overview",
+  "url": "https://www.tax.service.gov.uk/vat-through-software/vat-overview",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "vrn": "string",
+      "businessName": "string",
+      "penaltyPoints": {
+        "type": "integer",
+        "nullable": true
+      },
+      "nextPaymentDue": "string",
+      "returnsDueStatus": "string",
+      "returnsDue": {
+        "type": "integer",
+        "nullable": true
+      }
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
+    }
+  },
+  "effects": {
+    "reads": [
+      "tax.service.gov.uk"
+    ],
+    "writes": [],
+    "idempotent": true
+  },
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "vrnText": {
+          "selector": "#content span.govuk-caption-m"
+        },
+        "businessName": {
+          "selector": "#content span.govuk-caption-m + span.govuk-caption-m"
+        },
+        "penaltyText": {
+          "selector": "#penalties-banner div"
+        },
+        "nextPaymentDue": {
+          "selector": "#payments p.govuk-body"
+        },
+        "returnsDueStatus": {
+          "selector": "#next-return p.govuk-body"
+        }
+      },
+      "post": "({ 'vrn': $digits(vrnText), 'businessName': $text(businessName), 'penaltyPoints': $int(penaltyText), 'nextPaymentDue': $text(nextPaymentDue), 'returnsDueStatus': $text(returnsDueStatus), 'returnsDue': $int(returnsDueStatus) })",
+      "detect": {
+        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      }
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "name": "@notation/hmrc/business-account",
+  "url": "https://www.tax.service.gov.uk/business-account",
+  "returns": {
+    "type": "object",
+    "fields": {
+      "ctUtr": "string",
+      "ctAmountOwed": "number",
+      "ctReturnsStatus": "string",
+      "ctStatementUrl": "string",
+      "ctStatement": {
+        "$lens": "@notation/hmrc/ct-statement",
+        "params": {
+          "utr": "ctUtr"
+        }
+      },
+      "ctDetailsUrl": "string",
+      "ctDetails": {
+        "$lens": "@notation/hmrc/ct-details"
+      },
+      "vatVrn": "string",
+      "vatReturnsStatus": "string",
+      "vatReturnsToSubmit": {
+        "type": "integer",
+        "nullable": true
+      },
+      "vatHasPenalty": "boolean",
+      "vatPenaltyUrl": {
+        "type": "string",
+        "nullable": true
+      },
+      "vatPenalties": {
+        "$lens": "@notation/hmrc/vat-penalties",
+        "params": {
+          "vrn": "vatVrn"
+        }
+      },
+      "vatOverviewUrl": "string",
+      "vatOverview": {
+        "$lens": "@notation/hmrc/vat-overview"
+      }
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
+    }
+  },
+  "effects": {
+    "reads": [
+      "tax.service.gov.uk"
+    ],
+    "writes": [],
+    "idempotent": true
+  },
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "ctUtr": {
+          "selector": "#ct-heading .card-ref"
+        },
+        "ctAmountOwedText": {
+          "selector": "#ct-your-balance + p span"
+        },
+        "ctReturnsStatus": {
+          "selector": "#ct-your-returns + p"
+        },
+        "ctStatementUrl": {
+          "selector": "#view-ct-statement",
+          "attr": "href"
+        },
+        "ctDetailsUrl": {
+          "selector": "#ct-account-details-card-link",
+          "attr": "href"
+        },
+        "vatVrn": {
+          "selector": "#mtd-heading .card-ref"
+        },
+        "vatReturnsStatus": {
+          "selector": "#multiple-returns-count"
+        },
+        "vatPenaltyText": {
+          "selector": "#mtd-vat-penalty .govuk-warning-text__text"
+        },
+        "vatPenaltyUrl": {
+          "selector": "#mtd-vat-penalty a",
+          "attr": "href"
+        },
+        "vatOverviewUrl": {
+          "selector": "#mtd-card-manage-account",
+          "attr": "href"
+        }
+      },
+      "post": "({ 'ctUtr': $digits(ctUtr), 'ctAmountOwed': $money(ctAmountOwedText), 'ctReturnsStatus': $text(ctReturnsStatus), 'ctStatementUrl': $text(ctStatementUrl), 'ctDetailsUrl': $text(ctDetailsUrl), 'vatVrn': $digits(vatVrn), 'vatReturnsStatus': $text(vatReturnsStatus), 'vatReturnsToSubmit': $int(vatReturnsStatus), 'vatHasPenalty': $has(vatPenaltyText), 'vatPenaltyUrl': $text(vatPenaltyUrl), 'vatOverviewUrl': $text(vatOverviewUrl), 'vatPenalties': $has(vatPenaltyText) ? {} : null })",
+      "detect": {
+        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      }
+    }
+  ]
+}

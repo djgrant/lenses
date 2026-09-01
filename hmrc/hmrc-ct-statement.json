@@ -1,0 +1,66 @@
+{
+  "name": "@notation/hmrc/ct-statement",
+  "url": "https://www.tax.service.gov.uk/corporation-tax/org/{utr}/account/balanceperiods?lang=eng",
+  "params": {
+    "utr": {
+      "type": "string",
+      "default": {
+        "$lens": "@notation/hmrc/ct-summary",
+        "field": "utr"
+      }
+    }
+  },
+  "returns": {
+    "type": "array",
+    "items": {
+      "periodEnding": "string",
+      "status": "string",
+      "amount": "number",
+      "detailUrl": "string",
+      "detail": {
+        "$lens": "@notation/hmrc/ct-period",
+        "params": {
+          "utr": "$utr",
+          "period": "$split(detailUrl, '/')[-1]"
+        }
+      }
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
+    }
+  },
+  "effects": {
+    "reads": [
+      "tax.service.gov.uk"
+    ],
+    "writes": [],
+    "idempotent": true
+  },
+  "resolve": [
+    {
+      "kind": "dom",
+      "item": "#PortletCorporationTaxAccountPosition tbody tr",
+      "fields": {
+        "periodEnding": {
+          "selector": "td:nth-child(1) a"
+        },
+        "status": {
+          "selector": "td:nth-child(2)"
+        },
+        "amount": {
+          "selector": "td:nth-child(3)"
+        },
+        "detailUrl": {
+          "selector": "td:nth-child(1) a",
+          "attr": "href"
+        }
+      },
+      "post": "[$.{ 'periodEnding': $text(periodEnding), 'status': $text(status), 'amount': $money(amount), 'detailUrl': $text(detailUrl) }]",
+      "detect": {
+        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      }
+    }
+  ]
+}
