@@ -1,0 +1,71 @@
+{
+  "name": "@djgrant/freeagent/remove-year-end-signature",
+  "description": "Removes the approval signature from a FreeAgent year end, returning it to review and releasing its automatic account lock.",
+  "url": "https://{account}.freeagent.com/accounting/end_of_year/{end_date}",
+  "params": {
+    "end_date": {
+      "type": "string",
+      "default": {
+        "$lens": "@djgrant/freeagent/accounting-periods",
+        "field": "current_end_date"
+      }
+    }
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "removed": "boolean",
+      "end_date": "string",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "Sign in to your FreeAgent account, then retry."
+    },
+    "rejected": {
+      "hint": "FreeAgent rejected the signature removal or the selected year end is not signed."
+    }
+  },
+  "effects": {
+    "reads": [
+      "FreeAgent account year-end approval form"
+    ],
+    "writes": [
+      "FreeAgent account (removes a year-end approval signature and associated automatic account lock)"
+    ],
+    "idempotent": false,
+    "cache": 0
+  },
+  "resolve": [
+    {
+      "kind": "http",
+      "credentials": true,
+      "sources": {
+        "csrf": {
+          "request": "GET https://{account}.freeagent.com/accounting/end_of_year/{end_date}",
+          "items": "$match($, /action=\"\\/accounting\\/end_of_year\\/[0-9-]+\\/approve\"[\\s\\S]*?name=\"authenticity_token\" value=\"([^\"]+)\"/).groups[0]"
+        },
+        "result": {
+          "request": "POST https://{account}.freeagent.com/accounting/end_of_year/{end_date}/approve",
+          "credentials": "same-origin-page",
+          "headers": {
+            "X-CSRF-Token": "$csrf",
+            "Accept": "'text/html, application/xhtml+xml'"
+          },
+          "body": {
+            "search": {
+              "authenticity_token": "$csrf",
+              "_method": "'delete'"
+            }
+          }
+        }
+      },
+      "detect": {
+        "needs_auth": "$contains($csrf.url, '/login') or $contains($result.url, '/login') or $csrf.status = 401 or $result.status = 401",
+        "rejected": "$result.status >= 400"
+      },
+      "map": "{ 'removed': true, 'end_date': $end_date, 'confirmation': 'Year-end approval signature removed' }"
+    }
+  ]
+}
