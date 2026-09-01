@@ -1,0 +1,93 @@
+{
+  "name": "@djgrant/freeagent/update-opening-balance-pair",
+  "description": "Updates two existing non-bank FreeAgent opening-balance lines in one balanced save.",
+  "url": "https://{account}.freeagent.com/accounting/journal_sets/{journal_set_id}/edit",
+  "params": {
+    "journal_set_id": {
+      "type": "integer",
+      "default": {
+        "$lens": "@djgrant/freeagent/opening-balances",
+        "field": "journal_set_id"
+      }
+    },
+    "first_entry_id": "integer",
+    "first_side": {
+      "type": "string",
+      "enum": ["debit", "credit"]
+    },
+    "first_amount": "number",
+    "second_entry_id": "integer",
+    "second_side": {
+      "type": "string",
+      "enum": ["debit", "credit"]
+    },
+    "second_amount": "number"
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "saved": "boolean",
+      "journal_set_id": "integer",
+      "first_entry_id": "integer",
+      "first_side": "string",
+      "first_amount": "number",
+      "second_entry_id": "integer",
+      "second_side": "string",
+      "second_amount": "number",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "Sign in to your FreeAgent account, then retry."
+    },
+    "account_locked": {
+      "hint": "Remove or release the FreeAgent account lock covering the opening-balance date, then retry."
+    }
+  },
+  "detect": {
+    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')",
+    "account_locked": "$contains(text, 'An account lock is preventing you from amending your Opening Balances')"
+  },
+  "effects": {
+    "reads": [
+      "FreeAgent account opening-balance editor"
+    ],
+    "writes": [
+      "FreeAgent account (updates two existing opening-balance journal lines)"
+    ],
+    "idempotent": false,
+    "cache": 0
+  },
+  "perform": [
+    {
+      "wait": {
+        "appears": "#journal_entry_{first_entry_id} input[name$='[debit_value]']"
+      }
+    },
+    {
+      "wait": {
+        "appears": "#journal_entry_{second_entry_id} input[name$='[debit_value]']"
+      }
+    },
+    {
+      "fill": "#journal_entry_{first_entry_id} input[name$='[debit_value]']",
+      "value": "$string($first_side = 'debit' ? $first_amount : -$first_amount)"
+    },
+    {
+      "fill": "#journal_entry_{second_entry_id} input[name$='[debit_value]']",
+      "value": "$string($second_side = 'debit' ? $second_amount : -$second_amount)"
+    },
+    { "submit": "#journal_set" },
+    { "wait": { "gone": "#journal_set", "timeoutMs": 30000 } }
+  ],
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {
+        "heading": { "selector": "h1" }
+      },
+      "post": "{ 'saved': true, 'journal_set_id': $journal_set_id, 'first_entry_id': $first_entry_id, 'first_side': $first_side, 'first_amount': $first_amount, 'second_entry_id': $second_entry_id, 'second_side': $second_side, 'second_amount': $second_amount, 'confirmation': heading }"
+    }
+  ]
+}
