@@ -26,11 +26,11 @@
     },
     {
       "kind": "dom",
-      "item": "table.fe-DataTable-table tbody tr:has(td:nth-child(5)):not([data-inline-column-header-indicator-row])",
+      "item": "table.fe-DataTable-table tbody tr:has(td.fe-DataTable-cell--number:last-child):not([data-inline-column-header-indicator-row]):not([data-inline-total-row])",
       "fields": {
-        "date": {"selector": "td:nth-child(2)"}, "description": {"selector": "td:nth-child(3)"},
-        "href": {"selector": "td:nth-child(3) a", "attr": "href"},
-        "debit": {"selector": "td:nth-child(4)"}, "credit": {"selector": "td:nth-child(5)"}
+        "date": {"selector": "td[data-date-column]"}, "description": {"selector": "td[data-date-column] + td"},
+        "href": {"selector": "td[data-date-column] + td a", "attr": "href"},
+        "debit": {"selector": "td.fe-DataTable-cell--number:nth-last-child(2)"}, "credit": {"selector": "td.fe-DataTable-cell--number:last-child"}
       },
       "post": "{'transactions': [$.{'date': date, 'description': description, 'debit': $money(debit), 'credit': $money(credit), 'url': href ? href : null}]}"
     },
