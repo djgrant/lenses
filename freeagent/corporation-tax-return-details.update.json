@@ -1,0 +1,46 @@
+{
+  "name": "@djgrant/freeagent/update-corporation-tax-return-details",
+  "description": "Saves FreeAgent Corporation Tax return details: whether the return is an amendment, and an optional brought-forward trading losses override.",
+  "url": "https://{account}.freeagent.com/tax/corporation_tax_returns/{period}/edit",
+  "params": {
+    "period": "string",
+    "amended": {"type": "boolean", "default": false},
+    "override_brought_forward_losses": {"type": "boolean", "default": false},
+    "brought_forward_losses_amount": {"type": "number", "default": 0}
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "saved": "boolean",
+      "period": "string",
+      "amended": "boolean",
+      "override_brought_forward_losses": "boolean",
+      "brought_forward_losses_amount": "number",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
+  "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
+  "effects": {
+    "reads": ["FreeAgent account Corporation Tax return details form"],
+    "writes": ["FreeAgent account (saves Corporation Tax return amendment flag and brought-forward trading losses override)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "perform": [
+    {"wait": {"appears": "#edit_corporation_tax_return"}},
+    {"click": "label[for='corporation_tax_return_amended_{amended}']"},
+    {"click": "label[for='corporation_tax_return_brought_forward_trading_losses_override_{override_brought_forward_losses}']"},
+    {"fill": "#corporation_tax_return_ct600_values_attributes_0_number_value", "value": "$string($brought_forward_losses_amount)"},
+    {"click": "#edit_corporation_tax_return input[type='submit']"},
+    {"wait": {"gone": "#edit_corporation_tax_return", "timeoutMs": 30000}},
+    {"wait": {"appears": "[data-testid='flashMessage:success']", "timeoutMs": 15000}}
+  ],
+  "resolve": [
+    {
+      "kind": "dom",
+      "fields": {"flash": {"selector": "[data-testid='flashMessage:success']"}},
+      "post": "{'saved': true, 'period': $period, 'amended': $amended, 'override_brought_forward_losses': $override_brought_forward_losses, 'brought_forward_losses_amount': $brought_forward_losses_amount, 'confirmation': flash}"
+    }
+  ]
+}
