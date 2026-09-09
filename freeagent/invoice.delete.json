@@ -1,0 +1,72 @@
+{
+  "name": "@djgrant/freeagent/delete-invoice",
+  "description": "Marks an unpaid FreeAgent invoice as Draft and permanently deletes it, reversing its sales and receivables rather than writing it off as bad debt. A written-off invoice must be reopened first.",
+  "url": "https://{account}.freeagent.com/invoices/{invoice_id}",
+  "params": {
+    "invoice_id": "integer"
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "deleted": "boolean",
+      "invoice_id": "integer",
+      "reference": "string",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "Sign in to your FreeAgent account, then retry."
+    },
+    "rejected": {
+      "hint": "FreeAgent rejected the deletion. Remove any payment first; if the invoice is written off, reopen it before retrying."
+    }
+  },
+  "effects": {
+    "reads": [
+      "FreeAgent invoice page and draft transition result"
+    ],
+    "writes": [
+      "FreeAgent account (marks the selected unpaid invoice as Draft and permanently deletes it, reversing its accounting entries)"
+    ],
+    "idempotent": false,
+    "cache": 0
+  },
+  "resolve": [
+    {
+      "kind": "http",
+      "credentials": true,
+      "sources": {
+        "csrf": {
+          "request": "GET https://{account}.freeagent.com/invoices/{invoice_id}",
+          "items": "$match($, /name=\"csrf-token\" content=\"([^\"]+)\"/).groups[0]"
+        },
+        "draft_invoice": {
+          "request": "PUT https://{account}.freeagent.com/v2/invoices/{invoice_id}/transitions/mark_as_draft",
+          "credentials": "same-origin-page",
+          "headers": {
+            "X-CSRF-Token": "$csrf",
+            "X-Requested-With": "'XMLHttpRequest'",
+            "Accept": "'application/json'"
+          },
+          "items": "invoice"
+        },
+        "deleted": {
+          "request": "DELETE https://{account}.freeagent.com/v2/invoices/{invoice_id}",
+          "credentials": "same-origin-page",
+          "headers": {
+            "X-CSRF-Token": "$csrf",
+            "X-Requested-With": "'XMLHttpRequest'",
+            "Accept": "'application/json'"
+          },
+          "items": "'deleted'"
+        }
+      },
+      "detect": {
+        "needs_auth": "$contains($csrf.url, '/login') or $contains($draft_invoice.url, '/login') or $contains($deleted.url, '/login') or $csrf.status = 401 or $draft_invoice.status = 401 or $deleted.status = 401",
+        "rejected": "$draft_invoice.status >= 400 or ($exists($draft_invoice) and $draft_invoice.status >= 200 and $draft_invoice.status < 300 and $draft_invoice.body.invoice.status != 'Draft') or $deleted.status >= 400"
+      },
+      "map": "{ 'deleted': $deleted = 'deleted', 'invoice_id': $invoice_id, 'reference': $draft_invoice.reference, 'confirmation': 'Invoice ' & $draft_invoice.reference & ' permanently deleted' }"
+    }
+  ]
+}

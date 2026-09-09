@@ -9,7 +9,7 @@
         "type": "array",
         "items": {
           "period": "string",
-          "accounting_year": "string",
+          "accounting_year": {"type": "string", "nullable": true},
           "dated_on": "string",
           "description": "string",
           "payment_due": "string",
@@ -23,22 +23,22 @@
   },
   "outcomes": {"needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."}},
   "detect": {"needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"},
-  "helpers": {"money": "function($s) { ($v := $exists($s) ? $trim($s) : ''; $v = '' ? null : ($neg := $contains($v, '-'); $n := $number($replace($replace($replace($v, /-/, ''), /£/, ''), /,/, '')); $neg ? -$n : $n)) }"},
+  "helpers": {"money": "function($s) { ($v := $type($s) = 'string' ? $trim($s) : ''; $v = '' ? null : ($neg := $contains($v, '-'); $n := $number($replace($replace($replace($v, /-/, ''), /£/, ''), /,/, '')); $neg ? -$n : $n)) }"},
   "effects": {"reads": ["FreeAgent account Corporation Tax returns"], "writes": [], "idempotent": true, "cache": 0},
   "resolve": [
     {
       "kind": "dom",
-      "item": "table.Table tbody tr:has(a[href^='/tax/corporation_tax_returns/'])",
+      "item": "table.Table tbody tr:has(a[href*='/tax/corporation_tax_returns/'])",
       "fields": {
-        "dated_on": {"selector": "td:nth-child(1)"},
-        "description": {"selector": "td:nth-child(2)"},
-        "href": {"selector": "td:nth-child(2) a", "attr": "href"},
-        "payment_due": {"selector": "td:nth-child(3)"},
-        "liability": {"selector": "td:nth-child(4)"},
-        "payment": {"selector": "td:nth-child(5)"},
-        "balance_owed": {"selector": "td:nth-child(6)"}
+        "dated_on": {"selector": "td:has(+ td a[href*='/tax/corporation_tax_returns/'])"},
+        "description": {"selector": "a[href*='/tax/corporation_tax_returns/']"},
+        "href": {"selector": "a[href*='/tax/corporation_tax_returns/']", "attr": "href"},
+        "payment_due": {"selector": "td:has(> a[href*='/tax/corporation_tax_returns/']) + td"},
+        "liability": {"selector": "td.num.liability"},
+        "payment": {"selector": "td.num.payment"},
+        "balance_owed": {"selector": "td.num:not(.liability):not(.payment)"}
       },
-      "post": "{'returns': $.{'period': $match(href, /corporation_tax_returns\\/([^/?]+)/).groups[0], 'accounting_year': $match(description, /[0-9]{4}\\/[0-9]{2}/).match, 'dated_on': dated_on, 'description': description, 'payment_due': payment_due, 'liability': $money(liability), 'payment': $money(payment), 'balance_owed': $money(balance_owed), 'url': href}}"
+      "post": "{'returns': [$[$type(href) = 'string'].{'period': $match(href, /corporation_tax_returns\\/([^/?]+)/).groups[0], 'accounting_year': $type(description) = 'string' ? $match(description, /[0-9]{4}\\/[0-9]{2}/)[0].match : null, 'dated_on': dated_on, 'description': description, 'payment_due': payment_due, 'liability': $money(liability), 'payment': $money(payment), 'balance_owed': $money(balance_owed), 'url': href}]}"
     }
   ]
 }

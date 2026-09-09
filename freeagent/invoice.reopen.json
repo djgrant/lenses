@@ -1,0 +1,63 @@
+{
+  "name": "@djgrant/freeagent/reopen-written-off-invoice",
+  "description": "Reopens a FreeAgent invoice that was written off as unpaid, reversing the bad-debt write-off and restoring the receivable so the invoice can be corrected or deleted.",
+  "url": "https://{account}.freeagent.com/invoices/{invoice_id}",
+  "params": {
+    "invoice_id": "integer"
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "reopened": "boolean",
+      "invoice_id": "integer",
+      "reference": "string",
+      "status": "string",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {
+      "hint": "Sign in to your FreeAgent account, then retry."
+    },
+    "rejected": {
+      "hint": "FreeAgent rejected the reopen transition. Check that the invoice is currently written off."
+    }
+  },
+  "effects": {
+    "reads": [
+      "FreeAgent invoice page and reopen result"
+    ],
+    "writes": [
+      "FreeAgent account (reopens a written-off invoice, reversing the bad-debt write-off and restoring its receivable)"
+    ],
+    "idempotent": false,
+    "cache": 0
+  },
+  "resolve": [
+    {
+      "kind": "http",
+      "credentials": true,
+      "sources": {
+        "csrf": {
+          "request": "GET https://{account}.freeagent.com/invoices/{invoice_id}",
+          "items": "$match($, /name=\"csrf-token\" content=\"([^\"]+)\"/).groups[0]"
+        },
+        "reopened_invoice": {
+          "request": "PUT https://{account}.freeagent.com/v2/invoices/{invoice_id}/transitions/mark_as_sent",
+          "credentials": "same-origin-page",
+          "headers": {
+            "X-CSRF-Token": "$csrf",
+            "X-Requested-With": "'XMLHttpRequest'",
+            "Accept": "'application/json'"
+          },
+          "items": "invoice"
+        }
+      },
+      "detect": {
+        "needs_auth": "$contains($csrf.url, '/login') or $contains($reopened_invoice.url, '/login') or $csrf.status = 401 or $reopened_invoice.status = 401",
+        "rejected": "$reopened_invoice.status >= 400 or ($exists($reopened_invoice) and $reopened_invoice.status >= 200 and $reopened_invoice.status < 300 and ($reopened_invoice.body.invoice.status = 'Written-off' or $reopened_invoice.body.invoice.status = 'Cancelled'))"
+      },
+      "map": "{ 'reopened': $reopened_invoice.status != 'Written-off' and $reopened_invoice.status != 'Cancelled', 'invoice_id': $invoice_id, 'reference': $reopened_invoice.reference, 'status': $reopened_invoice.status, 'confirmation': 'Invoice ' & $reopened_invoice.reference & ' reopened' }"
+    }
+  ]
+}
