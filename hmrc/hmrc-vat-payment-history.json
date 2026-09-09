@@ -59,7 +59,7 @@
           "selector": "td:nth-child(4)"
         }
       },
-      "post": "([$.{ 'date': $text(date), 'description': $text(description), 'period': $text(period), 'paidToHmrc': $money(paidToHmrc), 'paidByHmrc': $money(paidByHmrc) }][[0..$limit - 1]])",
+      "post": "($append([], $map($, function($r){{ 'date': $text($r.date), 'description': $text($r.description), 'period': $text($r.period), 'paidToHmrc': $money($r.paidToHmrc), 'paidByHmrc': $money($r.paidByHmrc) }})[[0..$limit - 1]]))",
       "detect": {
         "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
       }
