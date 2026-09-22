@@ -1,0 +1,52 @@
+{
+  "name": "@djgrant/freeagent/update-bank-explanation",
+  "description": "Updates and approves a FreeAgent bank transaction explanation.",
+  "url": "https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit",
+  "params": {
+    "bank_account_id": "integer",
+    "entry_id": "integer",
+    "date": "string",
+    "amount": "number",
+    "main_type": "string",
+    "nominal_code": "string",
+    "sales_tax_rate": "number",
+    "description": "string"
+  },
+  "effects": {
+    "reads": ["FreeAgent bank transaction explanation form"],
+    "writes": ["FreeAgent account (updates and approves a bank transaction explanation)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "resolve": [{
+    "kind": "http",
+    "credentials": true,
+    "sources": {
+      "csrf": {
+        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit",
+        "items": "$match($, /name=\"csrf-token\" content=\"([^\"]+)\"/).groups[0]"
+      },
+      "saved": {
+        "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}",
+        "credentials": "same-origin-page",
+        "headers": {
+          "X-CSRF-Token": "$csrf",
+          "X-Requested-With": "'XMLHttpRequest'",
+          "Accept": "'text/html, application/xhtml+xml'"
+        },
+        "body": {"search": {
+          "_method": "'put'",
+          "authenticity_token": "$csrf",
+          "bank_account_entry[main_type]": "$main_type",
+          "bank_account_entry[dated_on]": "$date",
+          "bank_account_entry[gross_value]": "$string($amount)",
+          "bank_account_entry[nominal_code]": "$nominal_code",
+          "bank_account_entry[sales_tax_rate]": "$string($sales_tax_rate)",
+          "bank_account_entry[description]": "$description",
+          "commit": "'Approve & Save Changes'"
+        }}
+      }
+    },
+    "map": "{'entry_id': $entry_id, 'main_type': $main_type, 'amount': $amount, 'nominal_code': $nominal_code, 'sales_tax_rate': $sales_tax_rate, 'description': $description}"
+  }]
+}

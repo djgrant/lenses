@@ -1,0 +1,52 @@
+{
+  "name": "@djgrant/freeagent/split-bank-transaction",
+  "description": "Creates one split explanation for an imported FreeAgent bank transaction.",
+  "url": "https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/split/new?bank_transaction_id={bank_transaction_id}&continuing_split=true",
+  "params": {
+    "bank_account_id": "integer",
+    "bank_transaction_id": "integer",
+    "date": "string",
+    "amount": "number",
+    "main_type": "string",
+    "nominal_code": "string",
+    "sales_tax_rate": "number",
+    "description": "string"
+  },
+  "effects": {
+    "reads": ["FreeAgent split bank transaction form"],
+    "writes": ["FreeAgent account (creates a split bank transaction explanation)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "resolve": [{
+    "kind": "http",
+    "credentials": true,
+    "sources": {
+      "csrf": {
+        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/split/new?bank_transaction_id={bank_transaction_id}&continuing_split=true",
+        "items": "$match($, /name=\"csrf-token\" content=\"([^\"]+)\"/).groups[0]"
+      },
+      "saved": {
+        "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/split",
+        "credentials": "same-origin-page",
+        "headers": {
+          "X-CSRF-Token": "$csrf",
+          "X-Requested-With": "'XMLHttpRequest'",
+          "Accept": "'text/html, application/xhtml+xml'"
+        },
+        "body": {"search": {
+          "authenticity_token": "$csrf",
+          "bank_account_entry[bank_transaction_id]": "$string($bank_transaction_id)",
+          "bank_account_entry[main_type]": "$main_type",
+          "bank_account_entry[dated_on]": "$date",
+          "bank_account_entry[gross_value]": "$string($amount)",
+          "bank_account_entry[nominal_code]": "$nominal_code",
+          "bank_account_entry[sales_tax_rate]": "$string($sales_tax_rate)",
+          "bank_account_entry[description]": "$description",
+          "commit": "'Save and add another'"
+        }}
+      }
+    },
+    "map": "{'bank_transaction_id': $bank_transaction_id, 'main_type': $main_type, 'amount': $amount, 'nominal_code': $nominal_code, 'sales_tax_rate': $sales_tax_rate, 'description': $description}"
+  }]
+}

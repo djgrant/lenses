@@ -1,0 +1,75 @@
+{
+  "name": "@djgrant/freeagent/add-bank-transaction-fee-or-commission",
+  "description": "Adds a fee or commission explanation to an imported FreeAgent bank transaction.",
+  "url": "https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/fees/new?bank_transaction_id={bank_transaction_id}&continuing_split=true",
+  "params": {
+    "bank_account_id": "integer",
+    "bank_transaction_id": "integer",
+    "date": "string",
+    "amount": "number",
+    "status": {
+      "type": "string",
+      "enum": ["already_included", "add_to_total"]
+    },
+    "nominal_code": "string",
+    "sales_tax_rate": "number",
+    "description": "string",
+    "finish": {"type": "boolean", "default": true}
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "saved": "boolean",
+      "bank_transaction_id": "integer",
+      "status": "string",
+      "amount": "number",
+      "nominal_code": "string",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."},
+    "rejected": {"hint": "FreeAgent rejected the fee or commission. Check its status, amount, nominal code, VAT rate, and remaining unexplained value."}
+  },
+  "effects": {
+    "reads": ["FreeAgent fees and commissions form"],
+    "writes": ["FreeAgent account (adds a fee or commission bank transaction explanation)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "resolve": [{
+    "kind": "http",
+    "credentials": true,
+    "sources": {
+      "csrf": {
+        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/fees/new?bank_transaction_id={bank_transaction_id}&continuing_split=true",
+        "items": "$match($, /name=\"csrf-token\" content=\"([^\"]+)\"/).groups[0]"
+      },
+      "saved_page": {
+        "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/fees",
+        "credentials": "same-origin-page",
+        "headers": {
+          "X-CSRF-Token": "$csrf",
+          "X-Requested-With": "'XMLHttpRequest'",
+          "Accept": "'text/html, application/xhtml+xml'"
+        },
+        "body": {"search": {
+          "authenticity_token": "$csrf",
+          "bank_account_entry[bank_transaction_id]": "$string($bank_transaction_id)",
+          "bank_account_entry[main_type]": "$status = 'add_to_total' ? 'Refund' : 'Payment'",
+          "bank_account_entry[dated_on]": "$date",
+          "bank_account_entry[gross_value]": "$string($amount)",
+          "bank_account_entry[nominal_code]": "$nominal_code",
+          "bank_account_entry[sales_tax_rate]": "$string($sales_tax_rate)",
+          "bank_account_entry[description]": "$description",
+          "commit": "$finish ? 'Create and Finish' : 'Save and add another'"
+        }}
+      }
+    },
+    "detect": {
+      "needs_auth": "$contains($string($saved_page), 'Log in to FreeAgent')",
+      "rejected": "$contains($string($saved_page), 'could not be saved')"
+    },
+    "map": "{'saved': true, 'bank_transaction_id': $bank_transaction_id, 'status': $status, 'amount': $amount, 'nominal_code': $nominal_code, 'confirmation': 'Fee or commission added to bank transaction'}"
+  }]
+}

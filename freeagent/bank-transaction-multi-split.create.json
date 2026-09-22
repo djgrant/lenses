@@ -1,0 +1,94 @@
+{
+  "name": "@djgrant/freeagent/split-bank-transaction-multiple",
+  "description": "Splits one imported FreeAgent bank transaction into two explanation lines, saving the first and finishing with the second.",
+  "url": "https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/split/new?bank_transaction_id={bank_transaction_id}&continuing_split=true",
+  "params": {
+    "bank_account_id": "integer",
+    "bank_transaction_id": "integer",
+    "date": "string",
+    "first_amount": "number",
+    "first_main_type": "string",
+    "first_nominal_code": "string",
+    "first_sales_tax_rate": "number",
+    "first_description": "string",
+    "second_amount": "number",
+    "second_main_type": "string",
+    "second_nominal_code": "string",
+    "second_sales_tax_rate": "number",
+    "second_description": "string"
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "saved": "boolean",
+      "bank_transaction_id": "integer",
+      "line_count": "integer",
+      "confirmation": "string"
+    }
+  },
+  "outcomes": {
+    "needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."},
+    "rejected": {"hint": "FreeAgent rejected one of the split lines. Check the amounts, types, nominal codes, VAT rates, and remaining unexplained value."}
+  },
+  "effects": {
+    "reads": ["FreeAgent split bank transaction form"],
+    "writes": ["FreeAgent account (creates two bank transaction explanation lines)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "resolve": [{
+    "kind": "http",
+    "credentials": true,
+    "sources": {
+      "csrf": {
+        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/split/new?bank_transaction_id={bank_transaction_id}&continuing_split=true",
+        "items": "$match($, /name=\"csrf-token\" content=\"([^\"]+)\"/).groups[0]"
+      },
+      "first": {
+        "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/split",
+        "credentials": "same-origin-page",
+        "headers": {
+          "X-CSRF-Token": "$csrf",
+          "X-Requested-With": "'XMLHttpRequest'",
+          "Accept": "'text/html, application/xhtml+xml'"
+        },
+        "body": {"search": {
+          "authenticity_token": "$csrf",
+          "bank_account_entry[bank_transaction_id]": "$string($bank_transaction_id)",
+          "bank_account_entry[main_type]": "$first_main_type",
+          "bank_account_entry[dated_on]": "$date",
+          "bank_account_entry[gross_value]": "$string($first_amount)",
+          "bank_account_entry[nominal_code]": "$first_nominal_code",
+          "bank_account_entry[sales_tax_rate]": "$string($first_sales_tax_rate)",
+          "bank_account_entry[description]": "$first_description",
+          "commit": "'Save and add another'"
+        }}
+      },
+      "second": {
+        "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/split",
+        "credentials": "same-origin-page",
+        "headers": {
+          "X-CSRF-Token": "$csrf",
+          "X-Requested-With": "'XMLHttpRequest'",
+          "Accept": "'text/html, application/xhtml+xml'"
+        },
+        "body": {"search": {
+          "authenticity_token": "$csrf",
+          "bank_account_entry[bank_transaction_id]": "$string($bank_transaction_id)",
+          "bank_account_entry[main_type]": "$second_main_type",
+          "bank_account_entry[dated_on]": "$date",
+          "bank_account_entry[gross_value]": "$string($second_amount)",
+          "bank_account_entry[nominal_code]": "$second_nominal_code",
+          "bank_account_entry[sales_tax_rate]": "$string($second_sales_tax_rate)",
+          "bank_account_entry[description]": "$second_description",
+          "commit": "'Create and Finish'"
+        }}
+      }
+    },
+    "detect": {
+      "needs_auth": "$contains($string($first), 'Log in to FreeAgent') or $contains($string($second), 'Log in to FreeAgent')",
+      "rejected": "$contains($string($first), 'could not be saved') or $contains($string($second), 'could not be saved')"
+    },
+    "map": "{'saved': true, 'bank_transaction_id': $bank_transaction_id, 'line_count': 2, 'confirmation': 'Bank transaction split into two explanation lines'}"
+  }]
+}
