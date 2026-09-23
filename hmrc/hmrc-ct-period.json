@@ -28,11 +28,6 @@
       "total": "number"
     }
   },
-  "outcomes": {
-    "needs_auth": {
-      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
-    }
-  },
   "effects": {
     "reads": [
       "tax.service.gov.uk"
@@ -76,8 +71,10 @@
         }
       },
       "post": "($ref := $type(paymentReferenceText) = 'string' ? $match(paymentReferenceText, /[0-9]{10}A[0-9]{5}[A-Z]/)[0].match; { 'periodEnding': $strip(periodEnding, 'Accounting period ending'), 'paymentReference': $exists($ref) ? $ref : $text(paymentReferenceText), 'tax': $money(tax), 'interest': $money(interest), 'penalties': $money(penalties), 'subTotal': $money(subTotal), 'lessPaid': $money(lessPaid), 'repaymentsReallocations': $money(repaymentsReallocations), 'adjustments': $money(adjustments), 'total': $money(total) })",
-      "detect": {
-        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      "exceptions": {
+        "needs_auth": {
+          "matches": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+        }
       }
     }
   ]

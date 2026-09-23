@@ -3,40 +3,64 @@
   "description": "Enables VAT rates for trade outside the UK in FreeAgent.",
   "url": "https://{account}.freeagent.com/settings/uk_vat_registration",
   "effects": {
-    "reads": ["FreeAgent UK VAT registration settings"],
-    "writes": ["FreeAgent account (enables VAT rates other than standard UK rates)"],
+    "reads": [
+      "FreeAgent UK VAT registration settings"
+    ],
+    "writes": [
+      "FreeAgent account (enables VAT rates other than standard UK rates)"
+    ],
     "idempotent": false,
     "cache": 0
   },
-  "outcomes": {
-    "needs_auth": {"hint": "Sign in to FreeAgent, then retry."},
-    "rejected": {"hint": "FreeAgent did not enable the setting. Inspect the VAT registration form for validation errors."}
-  },
-  "resolve": [{
-    "kind": "http",
-    "credentials": true,
-    "sources": {
-      "page": {"request": "GET https://{account}.freeagent.com/settings/uk_vat_registration"},
-      "csrf": {"request": "GET https://{account}.freeagent.com/settings/uk_vat_registration", "items": "$match($, /name=\"authenticity_token\" value=\"([^\"]+)\"/).groups[0]"},
-      "saved": {
-        "request": "POST https://{account}.freeagent.com/settings/uk_vat_registration",
-        "credentials": "same-origin-page",
-        "headers": {"X-CSRF-Token": "$csrf", "X-Requested-With": "'XMLHttpRequest'", "Accept": "'text/html, application/xhtml+xml'"},
-        "body": {"search": {
-          "_method": "'put'",
-          "authenticity_token": "$csrf",
-          "company[latest_vat_registration_attributes][vat_registration_status]": "'Registered'",
-          "company[latest_vat_registration_attributes][id]": "$match($string($page), /value=\"([0-9]+)\" name=\"company\\[latest_vat_registration_attributes\\]\\[id\\]\"/).groups[0]",
-          "company[ec_vat_reporting_enabled]": "'true'",
-          "commit": "'Save changes'"
-        }}
+  "resolve": [
+    {
+      "kind": "http",
+      "credentials": true,
+      "sources": {
+        "page": {
+          "request": "GET https://{account}.freeagent.com/settings/uk_vat_registration"
+        },
+        "csrf": {
+          "request": "GET https://{account}.freeagent.com/settings/uk_vat_registration",
+          "items": "$match($, /name=\"authenticity_token\" value=\"([^\"]+)\"/).groups[0]"
+        },
+        "saved": {
+          "request": "POST https://{account}.freeagent.com/settings/uk_vat_registration",
+          "credentials": "same-origin-page",
+          "headers": {
+            "X-CSRF-Token": "$csrf",
+            "X-Requested-With": "'XMLHttpRequest'",
+            "Accept": "'text/html, application/xhtml+xml'"
+          },
+          "body": {
+            "search": {
+              "_method": "'put'",
+              "authenticity_token": "$csrf",
+              "company[latest_vat_registration_attributes][vat_registration_status]": "'Registered'",
+              "company[latest_vat_registration_attributes][id]": "$match($string($page), /value=\"([0-9]+)\" name=\"company\\[latest_vat_registration_attributes\\]\\[id\\]\"/).groups[0]",
+              "company[ec_vat_reporting_enabled]": "'true'",
+              "commit": "'Save changes'"
+            }
+          }
+        },
+        "verified": {
+          "request": "GET https://{account}.freeagent.com/settings/uk_vat_registration"
+        }
       },
-      "verified": {"request": "GET https://{account}.freeagent.com/settings/uk_vat_registration"}
+      "map": "{'enabled': true, 'confirmation': 'Non-standard VAT rates enabled and verified on registration form'}",
+      "exceptions": {
+        "rejected": {
+          "matches": "$exists($verified) and $not($exists($match($string($verified), /<input(?=[^>]*name=\"company\\[ec_vat_reporting_enabled\\]\")(?=[^>]*value=\"true\")(?=[^>]*checked)[^>]*>/)))"
+        }
+      }
+    }
+  ],
+  "exceptions": {
+    "needs_auth": {
+      "hint": "Sign in to FreeAgent, then retry."
     },
-    "detect": {
-      "needs_auth": "$contains($string($verified), 'Log in to FreeAgent')",
-      "rejected": "$exists($verified) and $not($exists($match($string($verified), /<input(?=[^>]*name=\"company\\[ec_vat_reporting_enabled\\]\")(?=[^>]*value=\"true\")(?=[^>]*checked)[^>]*>/)))"
-    },
-    "map": "{'enabled': true, 'confirmation': 'Non-standard VAT rates enabled and verified on registration form'}"
-  }]
+    "rejected": {
+      "hint": "FreeAgent did not enable the setting. Inspect the VAT registration form for validation errors."
+    }
+  }
 }

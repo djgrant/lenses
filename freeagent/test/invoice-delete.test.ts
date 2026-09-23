@@ -1,13 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "bun:test";
-import { executeLens, validateSpec, type EngineIO, type LensSpec } from "@djgrant/lens";
+import { executeLens, type EngineIO, type LensSpec } from "@djgrant/lenses/core";
+import { applyCatalogSettings } from "@djgrant/lenses";
 
 const catalog = resolve(import.meta.dirname, "..");
 const load = async (file: string): Promise<LensSpec> => {
   const shared = JSON.parse(await readFile(resolve(catalog, "catalog.json"), "utf8"));
   const spec = JSON.parse(await readFile(resolve(catalog, file), "utf8"));
-  return validateSpec({ ...spec, params: { ...shared.params, ...spec.params } });
+  return applyCatalogSettings(spec, shared);
 };
 
 const response = (url: string, method: string, status: number, body = "") => ({
@@ -91,6 +92,18 @@ describe("@djgrant/freeagent/delete-invoice", () => {
 
     expect(result).toMatchObject({ kind: "outcome", name: "needs_auth" });
     expect(requests).toHaveLength(1);
+  });
+
+  it("stops the chain on a 401 before the delete request", async () => {
+    const requests: string[] = [];
+    const spec = await load("invoice.delete.json");
+    const result = await executeLens(spec, { account: "example", invoice_id: 123 }, io(async (request) => {
+      requests.push(request.url);
+      if (request.method === "GET") return response(request.url, request.method, 200, page);
+      return response(request.url, request.method, 401, "{}");
+    }));
+    expect(result).toMatchObject({ kind: "outcome", name: "needs_auth" });
+    expect(requests).toHaveLength(2);
   });
 
   it("does not delete when FreeAgent rejects the draft transition", async () => {

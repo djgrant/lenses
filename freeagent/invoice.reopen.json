@@ -15,14 +15,6 @@
       "confirmation": "string"
     }
   },
-  "outcomes": {
-    "needs_auth": {
-      "hint": "Sign in to your FreeAgent account, then retry."
-    },
-    "rejected": {
-      "hint": "FreeAgent rejected the reopen transition. Check that the invoice is currently written off."
-    }
-  },
   "effects": {
     "reads": [
       "FreeAgent invoice page and reopen result"
@@ -53,11 +45,17 @@
           "items": "invoice"
         }
       },
-      "detect": {
-        "needs_auth": "$contains($csrf.url, '/login') or $contains($reopened_invoice.url, '/login') or $csrf.status = 401 or $reopened_invoice.status = 401",
-        "rejected": "$reopened_invoice.status >= 400 or ($exists($reopened_invoice) and $reopened_invoice.status >= 200 and $reopened_invoice.status < 300 and ($reopened_invoice.body.invoice.status = 'Written-off' or $reopened_invoice.body.invoice.status = 'Cancelled'))"
-      },
-      "map": "{ 'reopened': $reopened_invoice.status != 'Written-off' and $reopened_invoice.status != 'Cancelled', 'invoice_id': $invoice_id, 'reference': $reopened_invoice.reference, 'status': $reopened_invoice.status, 'confirmation': 'Invoice ' & $reopened_invoice.reference & ' reopened' }"
+      "map": "{ 'reopened': $reopened_invoice.status != 'Written-off' and $reopened_invoice.status != 'Cancelled', 'invoice_id': $invoice_id, 'reference': $reopened_invoice.reference, 'status': $reopened_invoice.status, 'confirmation': 'Invoice ' & $reopened_invoice.reference & ' reopened' }",
+      "exceptions": {
+        "rejected": {
+          "matches": "($reopened_invoice.status >= 400 or ($exists($reopened_invoice) and $reopened_invoice.status >= 200 and $reopened_invoice.status < 300 and ($reopened_invoice.body.invoice.status = 'Written-off' or $reopened_invoice.body.invoice.status = 'Cancelled'))) and $not($exists($reopened_invoice.status) and $reopened_invoice.status = 401)"
+        }
+      }
     }
-  ]
+  ],
+  "exceptions": {
+    "rejected": {
+      "hint": "FreeAgent rejected the reopen transition. Check that the invoice is currently written off."
+    }
+  }
 }

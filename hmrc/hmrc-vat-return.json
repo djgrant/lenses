@@ -62,11 +62,6 @@
       }
     }
   },
-  "outcomes": {
-    "needs_auth": {
-      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
-    }
-  },
   "effects": {
     "reads": [
       "tax.service.gov.uk"
@@ -125,8 +120,10 @@
         }
       },
       "post": "({ 'businessName': $strip(businessName, 'Submitted return for '), 'period': ($has(heading) and $has(businessName)) ? $trim($substringAfter(heading, businessName)) : null, 'returnTotal': $money($strip(returnTotal, 'Return total:')), 'owedToHmrc': $money($strip(owedToHmrc, 'You owe HMRC:')), 'dueDate': $strip(dueDate, 'Return due date:'), 'dateSubmitted': $strip(dateSubmitted, 'Date submitted:'), 'box1VatDueOnSales': $money(box1), 'box2VatDueOnAcquisitions': $money(box2), 'box3TotalVatDue': $money(box3), 'box4VatReclaimed': $money(box4), 'box5NetVat': $money(box5), 'box6TotalSales': $money(box6), 'box7TotalPurchases': $money(box7), 'box8TotalDispatches': $money(box8), 'box9TotalAcquisitions': $money(box9) })",
-      "detect": {
-        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      "exceptions": {
+        "needs_auth": {
+          "matches": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+        }
       }
     }
   ]

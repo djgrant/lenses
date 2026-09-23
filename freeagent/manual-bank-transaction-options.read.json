@@ -26,14 +26,6 @@
       }
     }
   },
-  "outcomes": {
-    "needs_auth": {
-      "hint": "Sign in to your FreeAgent account, then retry."
-    }
-  },
-  "detect": {
-    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"
-  },
   "effects": {
     "reads": [
       "FreeAgent manual bank-account entry form options"
@@ -56,7 +48,9 @@
       "kind": "dom",
       "item": "select[name$='[type]'] option[value]:not([value=''])",
       "fields": {
-        "label": { "selector": ":self" },
+        "label": {
+          "selector": ":self"
+        },
         "value": {
           "selector": ":self",
           "attr": "value"
@@ -68,7 +62,9 @@
       "kind": "dom",
       "item": "select[name*='category'] option[value]:not([value=''])",
       "fields": {
-        "label": { "selector": ":self" },
+        "label": {
+          "selector": ":self"
+        },
         "value": {
           "selector": ":self",
           "attr": "value"

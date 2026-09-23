@@ -14,14 +14,6 @@
       "confirmation": "string"
     }
   },
-  "outcomes": {
-    "needs_auth": {
-      "hint": "Sign in to your FreeAgent account, then retry."
-    },
-    "rejected": {
-      "hint": "FreeAgent rejected the deletion. Remove any payment first; if the invoice is written off, reopen it before retrying."
-    }
-  },
   "effects": {
     "reads": [
       "FreeAgent invoice page and draft transition result"
@@ -62,11 +54,17 @@
           "items": "'deleted'"
         }
       },
-      "detect": {
-        "needs_auth": "$contains($csrf.url, '/login') or $contains($draft_invoice.url, '/login') or $contains($deleted.url, '/login') or $csrf.status = 401 or $draft_invoice.status = 401 or $deleted.status = 401",
-        "rejected": "$draft_invoice.status >= 400 or ($exists($draft_invoice) and $draft_invoice.status >= 200 and $draft_invoice.status < 300 and $draft_invoice.body.invoice.status != 'Draft') or $deleted.status >= 400"
-      },
-      "map": "{ 'deleted': $deleted = 'deleted', 'invoice_id': $invoice_id, 'reference': $draft_invoice.reference, 'confirmation': 'Invoice ' & $draft_invoice.reference & ' permanently deleted' }"
+      "map": "{ 'deleted': $deleted = 'deleted', 'invoice_id': $invoice_id, 'reference': $draft_invoice.reference, 'confirmation': 'Invoice ' & $draft_invoice.reference & ' permanently deleted' }",
+      "exceptions": {
+        "rejected": {
+          "matches": "($draft_invoice.status >= 400 or ($exists($draft_invoice) and $draft_invoice.status >= 200 and $draft_invoice.status < 300 and $draft_invoice.body.invoice.status != 'Draft') or $deleted.status >= 400) and $not($exists($draft_invoice.status) and $draft_invoice.status = 401) and $not($exists($deleted.status) and $deleted.status = 401)"
+        }
+      }
     }
-  ]
+  ],
+  "exceptions": {
+    "rejected": {
+      "hint": "FreeAgent rejected the deletion. Remove any payment first; if the invoice is written off, reopen it before retrying."
+    }
+  }
 }

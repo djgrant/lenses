@@ -21,14 +21,6 @@
       }
     }
   },
-  "outcomes": {
-    "needs_auth": {
-      "hint": "Sign in to your FreeAgent account, then retry."
-    }
-  },
-  "detect": {
-    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')"
-  },
   "effects": {
     "reads": [
       "FreeAgent account posted journal entries"
@@ -44,9 +36,6 @@
       "credentials": true,
       "headers": {
         "Cache-Control": "no-cache"
-      },
-      "detect": {
-        "needs_auth": "$contains(url, '/login') or $contains($string(body), 'Log in to your FreeAgent account')"
       },
       "map": "($d := $match($, /<span class=\"description[^\"]*\">&mdash;\\s*([^<]+)<\\/span>/); $u := $match($, /href=\"\\/accounting\\/journal_sets\\/([0-9]+)\\/edit\"/); $n := $min([$count($d), $count($u), $limit]); { 'entries': $n > 0 ? [$map([0..$n - 1], function($i) { { 'id': $number($u[$i].groups[0]), 'description': $trim($d[$i].groups[0]), 'url': ('https://' & $account & '.freeagent.com') & '/accounting/journal_sets/' & $u[$i].groups[0] } })] : [] })"
     },

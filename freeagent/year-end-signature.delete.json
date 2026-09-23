@@ -19,14 +19,6 @@
       "confirmation": "string"
     }
   },
-  "outcomes": {
-    "needs_auth": {
-      "hint": "Sign in to your FreeAgent account, then retry."
-    },
-    "rejected": {
-      "hint": "FreeAgent rejected the signature removal or the selected year end is not signed."
-    }
-  },
   "effects": {
     "reads": [
       "FreeAgent account year-end approval form"
@@ -61,11 +53,17 @@
           }
         }
       },
-      "detect": {
-        "needs_auth": "$contains($csrf.url, '/login') or $contains($result.url, '/login') or $csrf.status = 401 or $result.status = 401",
-        "rejected": "$result.status >= 400"
-      },
-      "map": "{ 'removed': true, 'end_date': $end_date, 'confirmation': 'Year-end approval signature removed' }"
+      "map": "{ 'removed': true, 'end_date': $end_date, 'confirmation': 'Year-end approval signature removed' }",
+      "exceptions": {
+        "rejected": {
+          "matches": "($result.status >= 400) and $not($exists($result.status) and $result.status = 401)"
+        }
+      }
     }
-  ]
+  ],
+  "exceptions": {
+    "rejected": {
+      "hint": "FreeAgent rejected the signature removal or the selected year end is not signed."
+    }
+  }
 }

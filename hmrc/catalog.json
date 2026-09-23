@@ -8,5 +8,16 @@
     "strip": "function($t, $p){ $type($t) = 'string' ? $trim($replace($t, $p, '')) : null }",
     "after": "function($t, $p){ $type($t) = 'string' ? $trim($substringAfter($t, $p)) : null }",
     "before": "function($t, $p){ $type($t) = 'string' ? $trim($substringBefore($t, $p)) : null }"
-  }
+  },
+  "scopes": [
+    {
+      "url": "https://www.tax.service.gov.uk/*",
+      "exceptions": {
+        "needs_auth": {
+          "matches": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')",
+          "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
+        }
+      }
+    }
+  ]
 }

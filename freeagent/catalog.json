@@ -1,5 +1,16 @@
 {
   "params": {
     "account": "string"
-  }
+  },
+  "scopes": [
+    {
+      "url": "https://*.freeagent.com/*",
+      "exceptions": {
+        "needs_auth": {
+          "matches": "$contains(url, '/login') or status = 401 or $contains(title, 'Log in') or $contains($string(body), 'Log in to')",
+          "hint": "Sign in to your FreeAgent account, then retry."
+        }
+      }
+    }
+  ]
 }

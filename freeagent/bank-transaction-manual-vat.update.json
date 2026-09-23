@@ -12,53 +12,66 @@
     "description": "string"
   },
   "effects": {
-    "reads": ["FreeAgent bank explanation edit form"],
-    "writes": ["FreeAgent account (sets the VAT amount on a bank explanation)"],
+    "reads": [
+      "FreeAgent bank explanation edit form"
+    ],
+    "writes": [
+      "FreeAgent account (sets the VAT amount on a bank explanation)"
+    ],
     "idempotent": false,
     "cache": 0
   },
-  "outcomes": {
-    "needs_auth": {"hint": "Sign in to FreeAgent, then retry."},
-    "rejected": {"hint": "Inspect the saved explanation and VAT report before retrying."}
-  },
-  "resolve": [{
-    "kind": "http",
-    "credentials": true,
-    "sources": {
-      "csrf": {
-        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit",
-        "items": "$match($, /name=\"csrf-token\" content=\"([^\"]+)\"/).groups[0]"
-      },
-      "saved": {
-        "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}",
-        "credentials": "same-origin-page",
-        "headers": {
-          "X-CSRF-Token": "$csrf",
-          "X-Requested-With": "'XMLHttpRequest'",
-          "Accept": "'text/html, application/xhtml+xml'"
+  "resolve": [
+    {
+      "kind": "http",
+      "credentials": true,
+      "sources": {
+        "csrf": {
+          "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit",
+          "items": "$match($, /name=\"csrf-token\" content=\"([^\"]+)\"/).groups[0]"
         },
-        "body": {"search": {
-          "_method": "'put'",
-          "authenticity_token": "$csrf",
-          "bank_account_entry[main_type]": "'Payment'",
-          "bank_account_entry[dated_on]": "$date",
-          "bank_account_entry[gross_value]": "$string($amount)",
-          "bank_account_entry[nominal_code]": "$nominal_code",
-          "bank_account_entry[ec_status]": "''",
-          "bank_account_entry[sales_tax_rate]": "'-3.0'",
-          "bank_account_entry[manual_sales_tax_amount]": "$string($vat_amount)",
-          "bank_account_entry[description]": "$description",
-          "commit": "'Approve & Save Changes'"
-        }}
+        "saved": {
+          "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}",
+          "credentials": "same-origin-page",
+          "headers": {
+            "X-CSRF-Token": "$csrf",
+            "X-Requested-With": "'XMLHttpRequest'",
+            "Accept": "'text/html, application/xhtml+xml'"
+          },
+          "body": {
+            "search": {
+              "_method": "'put'",
+              "authenticity_token": "$csrf",
+              "bank_account_entry[main_type]": "'Payment'",
+              "bank_account_entry[dated_on]": "$date",
+              "bank_account_entry[gross_value]": "$string($amount)",
+              "bank_account_entry[nominal_code]": "$nominal_code",
+              "bank_account_entry[ec_status]": "''",
+              "bank_account_entry[sales_tax_rate]": "'-3.0'",
+              "bank_account_entry[manual_sales_tax_amount]": "$string($vat_amount)",
+              "bank_account_entry[description]": "$description",
+              "commit": "'Approve & Save Changes'"
+            }
+          }
+        },
+        "verified": {
+          "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit"
+        }
       },
-      "verified": {
-        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit"
+      "map": "{'entry_id': $entry_id, 'vat_amount': $vat_amount}",
+      "exceptions": {
+        "rejected": {
+          "matches": "$exists($verified) and ($not($contains($verified.body, 'selected=\"selected\" value=\"-3.0\"')) or $not($contains($verified.body, 'id=\"purchase_sales_tax_amount\" value=\"' & $string($vat_amount) & '\"')))"
+        }
       }
+    }
+  ],
+  "exceptions": {
+    "needs_auth": {
+      "hint": "Sign in to FreeAgent, then retry."
     },
-    "detect": {
-      "needs_auth": "$contains($verified.body, 'Log in to FreeAgent')",
-      "rejected": "$exists($verified) and ($not($contains($verified.body, 'selected=\"selected\" value=\"-3.0\"')) or $not($contains($verified.body, 'id=\"purchase_sales_tax_amount\" value=\"' & $string($vat_amount) & '\"')))"
-    },
-    "map": "{'entry_id': $entry_id, 'vat_amount': $vat_amount}"
-  }]
+    "rejected": {
+      "hint": "Inspect the saved explanation and VAT report before retrying."
+    }
+  }
 }

@@ -43,11 +43,6 @@
       }
     }
   },
-  "outcomes": {
-    "needs_auth": {
-      "hint": "HMRC session expired or not signed in. Open https://www.tax.service.gov.uk/business-account in the browser, sign in, then retry."
-    }
-  },
   "effects": {
     "reads": [
       "tax.service.gov.uk"
@@ -95,8 +90,10 @@
         }
       },
       "post": "({ 'vrn': $digits(vrn), 'returnsStatus': $text(returnsStatus), 'returnsToSubmit': $int(returnsStatus), 'hasPenalty': $has(penaltyText), 'penaltyUrl': $text(penaltyUrl), 'deadlinesUrl': $text(deadlinesUrl), 'submittedReturnsUrl': $text(submittedReturnsUrl), 'whatYouOweUrl': $text(whatYouOweUrl), 'paymentHistoryUrl': $text(paymentHistoryUrl), 'overviewUrl': $text(overviewUrl), 'penalties': $has(penaltyText) ? {} : null })",
-      "detect": {
-        "needs_auth": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+      "exceptions": {
+        "needs_auth": {
+          "matches": "$contains(url, '/sign-in-to-hmrc-online-services/') or $contains(title, 'Sign in to HMRC')"
+        }
       }
     }
   ]

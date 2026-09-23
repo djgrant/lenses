@@ -14,46 +14,60 @@
       "confirmation": "string"
     }
   },
-  "outcomes": {
-    "needs_auth": {"hint": "Sign in to your FreeAgent account, then retry."},
-    "rejected": {"hint": "FreeAgent rejected the explanation removal. Check that the explanation still exists and is removable."}
-  },
   "effects": {
-    "reads": ["FreeAgent bank explanation removal confirmation"],
-    "writes": ["FreeAgent account (removes a bank transaction explanation)"],
+    "reads": [
+      "FreeAgent bank explanation removal confirmation"
+    ],
+    "writes": [
+      "FreeAgent account (removes a bank transaction explanation)"
+    ],
     "idempotent": false,
     "cache": 0
   },
-  "resolve": [{
-    "kind": "http",
-    "credentials": true,
-    "sources": {
-      "confirmation_page": {
-        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/confirm_delete",
-        "headers": {"Accept": "'text/vnd.turbo-stream.html, text/html'"}
-      },
-      "csrf": {
-        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/confirm_delete",
-        "headers": {"Accept": "'text/vnd.turbo-stream.html, text/html'"},
-        "items": "$match($, /name=\"authenticity_token\" value=\"([^\"]+)\"/).groups[0]"
-      },
-      "removed_page": {
-        "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}",
-        "credentials": "same-origin-page",
-        "headers": {
-          "X-CSRF-Token": "$csrf",
-          "Accept": "'text/html, application/xhtml+xml'"
+  "resolve": [
+    {
+      "kind": "http",
+      "credentials": true,
+      "sources": {
+        "confirmation_page": {
+          "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/confirm_delete",
+          "headers": {
+            "Accept": "'text/vnd.turbo-stream.html, text/html'"
+          }
         },
-        "body": {"search": {
-          "_method": "'delete'",
-          "authenticity_token": "$csrf"
-        }}
+        "csrf": {
+          "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/confirm_delete",
+          "headers": {
+            "Accept": "'text/vnd.turbo-stream.html, text/html'"
+          },
+          "items": "$match($, /name=\"authenticity_token\" value=\"([^\"]+)\"/).groups[0]"
+        },
+        "removed_page": {
+          "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}",
+          "credentials": "same-origin-page",
+          "headers": {
+            "X-CSRF-Token": "$csrf",
+            "Accept": "'text/html, application/xhtml+xml'"
+          },
+          "body": {
+            "search": {
+              "_method": "'delete'",
+              "authenticity_token": "$csrf"
+            }
+          }
+        }
+      },
+      "map": "{'removed': true, 'entry_id': $entry_id, 'confirmation': 'Bank transaction explanation removed'}",
+      "exceptions": {
+        "rejected": {
+          "matches": "$contains($string($removed_page), 'could not be removed')"
+        }
       }
-    },
-    "detect": {
-      "needs_auth": "$contains($string($confirmation_page), 'Log in to FreeAgent') or $contains($string($removed_page), 'Log in to FreeAgent')",
-      "rejected": "$contains($string($removed_page), 'could not be removed')"
-    },
-    "map": "{'removed': true, 'entry_id': $entry_id, 'confirmation': 'Bank transaction explanation removed'}"
-  }]
+    }
+  ],
+  "exceptions": {
+    "rejected": {
+      "hint": "FreeAgent rejected the explanation removal. Check that the explanation still exists and is removable."
+    }
+  }
 }

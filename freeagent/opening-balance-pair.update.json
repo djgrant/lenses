@@ -13,13 +13,19 @@
     "first_entry_id": "integer",
     "first_side": {
       "type": "string",
-      "enum": ["debit", "credit"]
+      "enum": [
+        "debit",
+        "credit"
+      ]
     },
     "first_amount": "number",
     "second_entry_id": "integer",
     "second_side": {
       "type": "string",
-      "enum": ["debit", "credit"]
+      "enum": [
+        "debit",
+        "credit"
+      ]
     },
     "second_amount": "number"
   },
@@ -36,18 +42,6 @@
       "second_amount": "number",
       "confirmation": "string"
     }
-  },
-  "outcomes": {
-    "needs_auth": {
-      "hint": "Sign in to your FreeAgent account, then retry."
-    },
-    "account_locked": {
-      "hint": "Remove or release the FreeAgent account lock covering the opening-balance date, then retry."
-    }
-  },
-  "detect": {
-    "needs_auth": "$contains(url, '/login') or $contains(title, 'Log in')",
-    "account_locked": "$contains(text, 'An account lock is preventing you from amending your Opening Balances')"
   },
   "effects": {
     "reads": [
@@ -78,16 +72,31 @@
       "fill": "#journal_entry_{second_entry_id} input[name$='[debit_value]']",
       "value": "$string($second_side = 'debit' ? $second_amount : -$second_amount)"
     },
-    { "submit": "#journal_set" },
-    { "wait": { "gone": "#journal_set", "timeoutMs": 30000 } }
+    {
+      "submit": "#journal_set"
+    },
+    {
+      "wait": {
+        "gone": "#journal_set",
+        "timeoutMs": 30000
+      }
+    }
   ],
   "resolve": [
     {
       "kind": "dom",
       "fields": {
-        "heading": { "selector": "h1" }
+        "heading": {
+          "selector": "h1"
+        }
       },
       "post": "{ 'saved': true, 'journal_set_id': $journal_set_id, 'first_entry_id': $first_entry_id, 'first_side': $first_side, 'first_amount': $first_amount, 'second_entry_id': $second_entry_id, 'second_side': $second_side, 'second_amount': $second_amount, 'confirmation': heading }"
     }
-  ]
+  ],
+  "exceptions": {
+    "account_locked": {
+      "matches": "$contains(text, 'An account lock is preventing you from amending your Opening Balances')",
+      "hint": "Remove or release the FreeAgent account lock covering the opening-balance date, then retry."
+    }
+  }
 }
