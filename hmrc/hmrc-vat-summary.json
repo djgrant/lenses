@@ -59,7 +59,7 @@
           "selector": "#mtd-heading .card-ref"
         },
         "returnsStatus": {
-          "selector": "#multiple-returns-count"
+          "selector": "#multiple-returns-count, #one-return-due-date"
         },
         "penaltyText": {
           "selector": "#mtd-vat-penalty .govuk-warning-text__text"
@@ -69,11 +69,11 @@
           "attr": "href"
         },
         "deadlinesUrl": {
-          "selector": "#multiple-returns-view-deadlines",
+          "selector": "#multiple-returns-view-deadlines, #one-return-view-deadlines",
           "attr": "href"
         },
         "submittedReturnsUrl": {
-          "selector": "#multiple-returns-submitted-returns",
+          "selector": "#multiple-returns-submitted-returns, #one-return-submitted-returns",
           "attr": "href"
         },
         "whatYouOweUrl": {
