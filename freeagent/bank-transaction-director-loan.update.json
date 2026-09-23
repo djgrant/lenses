@@ -1,0 +1,61 @@
+{
+  "name": "@djgrant/freeagent/set-bank-explanation-director-loan",
+  "description": "Reclassifies a bank explanation as a director loan payment.",
+  "url": "https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit",
+  "params": {
+    "bank_account_id": "integer",
+    "entry_id": "integer",
+    "date": "string",
+    "amount": "number",
+    "description": "string",
+    "paid_user_id": "integer"
+  },
+  "effects": {
+    "reads": ["FreeAgent bank explanation edit form"],
+    "writes": ["FreeAgent account (moves a bank payment to the director loan account)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "outcomes": {
+    "needs_auth": {"hint": "Sign in to FreeAgent, then retry."},
+    "rejected": {"hint": "Inspect the saved explanation and VAT report before retrying."}
+  },
+  "resolve": [{
+    "kind": "http",
+    "credentials": true,
+    "sources": {
+      "csrf": {
+        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit",
+        "items": "$match($, /name=\"csrf-token\" content=\"([^\"]+)\"/).groups[0]"
+      },
+      "saved": {
+        "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}",
+        "credentials": "same-origin-page",
+        "headers": {
+          "X-CSRF-Token": "$csrf",
+          "X-Requested-With": "'XMLHttpRequest'",
+          "Accept": "'text/html, application/xhtml+xml'"
+        },
+        "body": {"search": {
+          "_method": "'put'",
+          "authenticity_token": "$csrf",
+          "bank_account_entry[main_type]": "'Money Paid to User'",
+          "bank_account_entry[dated_on]": "$date",
+          "bank_account_entry[gross_value]": "$string($amount)",
+          "bank_account_entry[nominal_code]": "'907'",
+          "bank_account_entry[paid_user_id]": "$string($paid_user_id)",
+          "bank_account_entry[description]": "$description",
+          "commit": "'Approve & Save Changes'"
+        }}
+      },
+      "verified": {
+        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit"
+      }
+    },
+    "detect": {
+      "needs_auth": "$contains($verified.body, 'Log in to FreeAgent')",
+      "rejected": "$exists($verified) and ($not($contains($verified.body, 'selected=\"selected\" value=\"Money Paid to User\"')) or $not($contains($verified.body, 'selected=\"selected\" value=\"907\"')))"
+    },
+    "map": "{'entry_id': $entry_id, 'director_loan': true, 'amount': $amount}"
+  }]
+}

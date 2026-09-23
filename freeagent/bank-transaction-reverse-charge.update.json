@@ -1,0 +1,62 @@
+{
+  "name": "@djgrant/freeagent/set-bank-explanation-reverse-charge",
+  "description": "Sets a FreeAgent bank explanation to reverse-charge VAT.",
+  "url": "https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit",
+  "params": {
+    "bank_account_id": "integer",
+    "entry_id": "integer",
+    "date": "string",
+    "amount": "number",
+    "nominal_code": "string",
+    "description": "string"
+  },
+  "effects": {
+    "reads": ["FreeAgent bank explanation edit form"],
+    "writes": ["FreeAgent account (updates a bank explanation to reverse-charge VAT)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "outcomes": {
+    "needs_auth": {"hint": "Sign in to FreeAgent, then retry."},
+    "rejected": {"hint": "FreeAgent did not retain the Reverse Charge option or 0% supplier VAT. Inspect the bank explanation for validation errors."}
+  },
+  "resolve": [{
+    "kind": "http",
+    "credentials": true,
+    "sources": {
+      "csrf": {
+        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit",
+        "items": "$match($, /name=\"csrf-token\" content=\"([^\"]+)\"/).groups[0]"
+      },
+      "saved": {
+        "request": "POST https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}",
+        "credentials": "same-origin-page",
+        "headers": {
+          "X-CSRF-Token": "$csrf",
+          "X-Requested-With": "'XMLHttpRequest'",
+          "Accept": "'text/html, application/xhtml+xml'"
+        },
+        "body": {"search": {
+          "_method": "'put'",
+          "authenticity_token": "$csrf",
+          "bank_account_entry[main_type]": "'Payment'",
+          "bank_account_entry[dated_on]": "$date",
+          "bank_account_entry[gross_value]": "$string($amount)",
+          "bank_account_entry[nominal_code]": "$nominal_code",
+          "bank_account_entry[ec_status]": "'4'",
+          "bank_account_entry[sales_tax_rate]": "'-1.0'",
+          "bank_account_entry[description]": "$description",
+          "commit": "'Approve & Save Changes'"
+        }}
+      },
+      "verified": {
+        "request": "GET https://{account}.freeagent.com/bank_accounts/{bank_account_id}/bank_account_entries/{entry_id}/edit"
+      }
+    },
+    "detect": {
+      "needs_auth": "$contains($string($verified), 'Log in to FreeAgent')",
+      "rejected": "$exists($verified) and ($not($contains($verified.body, 'id=\"ec_status_reverse_charge\"')) or $not($contains($verified.body, 'value=\"4\" checked=\"checked\" name=\"bank_account_entry[ec_status]\"')) or $not($contains($verified.body, 'selected=\"selected\" value=\"0.0\"')))"
+    },
+    "map": "{'entry_id': $entry_id, 'reverse_charge': true, 'supplier_vat_rate': '0%', 'amount': $amount, 'nominal_code': $nominal_code}"
+  }]
+}
