@@ -1,0 +1,44 @@
+{
+  "name": "@djgrant/github/issue-attachment",
+  "description": "Uploads a local file (image, video, PDF) to GitHub as a user attachment through an issue's comment box and returns its github.com/user-attachments URL, ready to paste into an issue or PR body. Nothing is posted: the comment box is cleared first and the upload only fills its draft.",
+  "url": "https://github.com/{owner}/{repo}/issues/{issue}",
+  "params": {
+    "owner": "string",
+    "repo": "string",
+    "issue": "integer",
+    "path": "string"
+  },
+  "returns": {
+    "type": "object",
+    "fields": {
+      "url": "string",
+      "name": "string",
+      "size": "integer",
+      "content_type": "string"
+    }
+  },
+  "effects": {
+    "reads": ["github.com issue page"],
+    "writes": ["GitHub user attachments (uploads a new copy of the file on every call)"],
+    "idempotent": false,
+    "cache": 0
+  },
+  "perform": [
+    { "wait": { "appears": "textarea[placeholder='Use Markdown to format your comment']", "timeoutMs": 15000 } },
+    { "fill": "textarea[placeholder='Use Markdown to format your comment']", "value": "" },
+    { "drop": "textarea[placeholder='Use Markdown to format your comment']", "file": "path" }
+  ],
+  "resolve": [
+    {
+      "kind": "intercept",
+      "request": "PUT https://github.com/upload/assets/*",
+      "waitMs": 180000,
+      "map": {
+        "url": "href",
+        "name": "name",
+        "size": "size",
+        "content_type": "content_type"
+      }
+    }
+  ]
+}

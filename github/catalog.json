@@ -1,0 +1,13 @@
+{
+  "scopes": [
+    {
+      "url": "https://github.com/*",
+      "exceptions": {
+        "needs_auth": {
+          "matches": "$contains(url, 'github.com/login') or $contains(url, 'github.com/session') or status = 401",
+          "hint": "Sign in to GitHub in the browser, then retry."
+        }
+      }
+    }
+  ]
+}
